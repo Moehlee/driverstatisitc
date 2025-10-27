@@ -5,9 +5,9 @@ import l, {LatLngExpression} from "leaflet";
 import {CTM_Colors} from "../Helper";
 
 const icon = l.icon({
-    iconUrl: "blob:null/01fa31bd-b919-4891-81a2-265e03ced77a",
-    iconSize: [40, 20],
-    iconAnchor: [20, 20]
+    iconUrl: "https://cdn-icons-png.freepik.com/512/2/2013.png",
+    iconSize: [10, 10],
+    iconAnchor: [5, 5]
 })
 
 

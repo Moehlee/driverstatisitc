@@ -1,14 +1,15 @@
-import React, {useEffect, useState} from "react";
-import LiveTiming from "./components/LiveTiming";
+import React, { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { createTheme, CssBaseline, ThemeProvider } from "@mui/material";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import CTMAppBar from './components/bar/CTMAppBar';
-import {CTM_Colors} from "./Helper";
-import {createTheme, CssBaseline, ThemeProvider} from "@mui/material";
+
+import CTMAppBar from "./components/bar/CTMAppBar";
+import { CTM_Colors } from "./Helper";
 import pb from "./api/pocketbase";
-import 'leaflet/dist/leaflet.css';
-import LiveMap from "./components/LiveMap";
-import './App.css';
+import HomePage from "./pages/HomePage";
+import DisciplinePage from "./pages/DisciplinePage";
+import RunDetailPage from "./pages/RunDetailPage";
 
 const dark_theme = createTheme({
     palette: {
@@ -52,7 +53,7 @@ const App = () => {
         localStorage.setItem('darkMode', JSON.stringify(isDarkmode));
     }, [isDarkmode]);
 
-// check if the user is already logged in
+    // check if the user is already logged in
     useEffect(() => {
         if (pb.authStore.isValid) {
             setIsLoggedIn(true); // User is already authenticated
@@ -73,21 +74,17 @@ const App = () => {
     return (
         <ThemeProvider theme={isDarkmode ? dark_theme : light_theme}>
             <CssBaseline />
-            <>
-                <CTMAppBar isDarkmode={isDarkmode} onThemeChange={setIsDarkmode}
-                           logoutHandler={handleLogout}></CTMAppBar>
-
-                <div className="main-layout">
-                    <div className="map-container">
-                        <LiveMap/>
-                    </div>
-                    <div className="livetiming-container">
-                        <LiveTiming/>
-                    </div>
-                </div>
-
+                <CTMAppBar
+                    isDarkmode={isDarkmode}
+                    onThemeChange={setIsDarkmode}
+                    logoutHandler={handleLogout}
+                />
+                <Routes>
+                    <Route path="/" element={<HomePage/>}/>
+                    <Route path="/discipline/:name" element={<DisciplinePage/>} />
+                    <Route path="/run/:id" element={<RunDetailPage/>} />
+                </Routes>
                 <ToastContainer position="bottom-right" theme={isDarkmode ? "dark" : "light"}/>
-            </>
         </ThemeProvider>
     );
 }
