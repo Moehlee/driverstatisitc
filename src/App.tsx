@@ -10,6 +10,7 @@ import pb from "./api/pocketbase";
 import HomePage from "./pages/HomePage";
 import DisciplinePage from "./pages/DisciplinePage";
 import RunDetailPage from "./pages/RunDetailPage";
+import GPSTrackViewer from "./components/GPSTrackViewer";
 
 const dark_theme = createTheme({
     palette: {
@@ -83,6 +84,7 @@ const App = () => {
                     <Route path="/" element={<HomePage/>}/>
                     <Route path="/discipline/:name" element={<DisciplinePage/>} />
                     <Route path="/run/:id" element={<RunDetailPage/>} />
+                    <Route path="/gps-viewer" element={<GPSTrackViewer />} />
                 </Routes>
                 <ToastContainer position="bottom-right" theme={isDarkmode ? "dark" : "light"}/>
         </ThemeProvider>

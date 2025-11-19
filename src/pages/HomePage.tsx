@@ -15,15 +15,12 @@ const HomePage = () => {
 
     return (
         <Box sx={{ p: 4 }}>
-            <Typography variant="h4" gutterBottom>
-                Formula Student Live Timing
-            </Typography>
             <Box sx={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                gap: 2,
-                maxWidth: 800,
-                margin: '0 auto'
+                gridTemplateColumns: '1fr',
+                gap: 4,
+                maxWidth: 400,
+                margin: '0 auto',
             }}>
                 {disciplines.map((disc) => (
                     <Button
@@ -31,7 +28,7 @@ const HomePage = () => {
                         variant="contained"
                         sx={{
                             bgcolor: disc.color,
-                            color: "#fff",
+                            color: "#000000",
                             p: 2,
                             height: 80,
                             fontSize: '1.1rem'

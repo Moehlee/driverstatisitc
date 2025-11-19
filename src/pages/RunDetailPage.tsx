@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { Box, Typography } from "@mui/material";
 import LiveMap from "../components/LiveMap";
 import LiveTiming from "../components/LiveTiming";
+import StatView from "../components/StatView";
 
 const RunDetailPage = () => {
     const { id } = useParams();
@@ -16,6 +17,7 @@ const RunDetailPage = () => {
                 </Box>
                 <Box sx={{ flex: 1 }}>
                     <LiveTiming />
+
                 </Box>
             </Box>
         </Box>
