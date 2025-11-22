@@ -25,7 +25,6 @@ function decodeCanGps(hexString: string): [number, number] {
     return [ latRaw / 1e7, lonRaw / 1e7];
 }
 
-
 // Log Parser
 function parseGpsFromLog(text: string): [number, number][] {
     const lines = text.split("\n");
@@ -51,9 +50,12 @@ const LiveMap: React.FC = () => {
     const [path, setPath] = useState<[number, number][]>([]);
 
     const [startFinish, setStartFinish] = useState<[number, number] | null>(null);
+    const [sectors, setSectors] = useState<[number, number][]>([]);
     const [lapTimes, setLapTimes] = useState<number[]>([]);
     const lastCrossTime = useRef<number | null>(null);
-
+    const sectorTimesRef = useRef<number[]>([]);
+    const currentSectorRef = useRef<number>(0);
+    const sectorCrossTimes = useRef<number[]>([]); // Neue Referenz für Sektor-Zeitstempel
 
     useEffect(() => {
         async function loadLog() {
@@ -75,16 +77,37 @@ const LiveMap: React.FC = () => {
 
                     mapRef.current.on("click", (e: any) => {
                         const point: [number, number] = [e.latlng.lat, e.latlng.lng];
-                        setStartFinish(point);
 
-                        // Startpunkt sichtbar machen
-                        l.circleMarker(point, {
-                            radius: 8,
-                            color: "red",
-                            weight: 3
-                        }).addTo(mapRef.current!);
+                        // Strg + Linksklick = Sektor, normaler Linksklick = Start/Ziel
+                        if (e.originalEvent.ctrlKey) {
+                            // Sektor hinzufügen
+                            setSectors(prev => [...prev, point]);
 
-                        console.log("Start/Ziel gesetzt:", point);
+                            // Sektor anzeigen
+                            l.circleMarker(point, {
+                                radius: 6,
+                                color: "blue",
+                                weight: 3,
+                                fillColor: "blue",
+                                fillOpacity: 0.5
+                            })
+                                .bindPopup(`Sektor ${sectors.length + 1}`)
+                                .addTo(mapRef.current!);
+
+                            console.log(`Sektor ${sectors.length + 1} gesetzt:`, point);
+                        } else {
+                            // Start/Ziel setzen
+                            setStartFinish(point);
+
+                            // Startpunkt sichtbar machen
+                            l.circleMarker(point, {
+                                radius: 8,
+                                color: "red",
+                                weight: 3
+                            }).addTo(mapRef.current!);
+
+                            console.log("Start/Ziel gesetzt:", point);
+                        }
                     });
 
                     l.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -125,37 +148,74 @@ const LiveMap: React.FC = () => {
                 return;
             }
             const pos = path[index];
+            const now = performance.now();
 
+            // Sektor-Erkennung
+            if (sectors.length > 0) {
+                for (let i = 0; i < sectors.length; i++) {
+                    const sector = sectors[i];
+                    const distToSector = Math.sqrt(
+                        Math.pow(pos[0] - sector[0], 2) +
+                        Math.pow(pos[1] - sector[1], 2)
+                    );
+
+                    if (distToSector < 0.00002 && currentSectorRef.current === i) {
+                        const sectorTime = now - (sectorCrossTimes.current[i-1] || lastCrossTime.current || now);
+                        sectorTimesRef.current[i] = sectorTime;
+                        sectorCrossTimes.current[i] = now;
+                        currentSectorRef.current = i + 1;
+                        console.log(`Sektor ${i + 1} Zeit: ${(sectorTime / 1000).toFixed(3)}s`);
+                    }
+                }
+            }
+
+            // Start/Ziel-Erkennung
             if (startFinish) {
                 const dist = Math.sqrt(
                     Math.pow(pos[0] - startFinish[0], 2) +
                     Math.pow(pos[1] - startFinish[1], 2)
                 );
 
-
-                // DEBUG: Prüfe ob wir nahe genug sind
-                console.log("DEBUG - Distance:", dist, "Threshold: 0.00005", "Within range:", dist < 0.00005);
-
-                if (dist < 0.00002) { // 5 m Radius
+                if (dist < 0.00002) {
                     const now = performance.now();
 
                     if (lastCrossTime.current !== null) {
                         const lapTimeMs = now - lastCrossTime.current;
-                        console.log("DEBUG - Lap time calculated:", lapTimeMs, "ms");
 
+                        // Korrekte Sektorzeit-Berechnung
+                        const finalSectorTimes: number[] = [];
+
+                        // Start bis Sektor 1
+                        if (sectors.length > 0) {
+                            finalSectorTimes[0] = sectorCrossTimes.current[0] - lastCrossTime.current;
+
+                            //Sektor i bis Sektor i+1
+                            for (let i = 1; i < sectors.length; i++) {
+                                finalSectorTimes[i] = sectorCrossTimes.current[i] - sectorCrossTimes.current[i-1];
+                            }
+
+                            // Lletzter Sektor bis Start/Ziel
+                            finalSectorTimes[sectors.length] = now - sectorCrossTimes.current[sectors.length-1];
+                        }
+
+                        console.log("DEBUG - Lap time calculated:", lapTimeMs, "ms");
                         setLapTimes(prev => [...prev, lapTimeMs]);
 
                         localStorage.setItem("latestLap", lapTimeMs.toString());
                         localStorage.setItem("lapTimeStamp", Date.now().toString());
 
+                        localStorage.setItem("sectorTimes", JSON.stringify(finalSectorTimes));
 
                         console.log("Runde beendet:", lapTimeMs / 1000, "s");
+                        console.log("Sektorzeiten:", finalSectorTimes.map(time => (time / 1000).toFixed(3)));
+                        console.log("Summe Sektorzeiten:", finalSectorTimes.reduce((a, b) => a + b, 0) / 1000, "s");
 
                         pb.collection("laps").create({
                             driver: "Driver",
                             lapTime: (lapTimeMs / 1000).toFixed(3),
                             timeStamp: new Date().toISOString(),
                             cones: 0,
+                            sectors: finalSectorTimes.map(time => (time / 1000).toFixed(3))
                         })
                             .then(() => {
                                 console.log("Lap saved to PocketBase");
@@ -166,6 +226,9 @@ const LiveMap: React.FC = () => {
                     }
 
                     lastCrossTime.current = now;
+                    currentSectorRef.current = 0;
+                    sectorTimesRef.current = [];
+                    sectorCrossTimes.current = [];
                 }
             }
 
@@ -183,7 +246,7 @@ const LiveMap: React.FC = () => {
         }, 150);
 
         return () => clearInterval(interval);
-    }, [path, startFinish]); // startFinish als Dependency hinzufügen
+    }, [path, startFinish, sectors]);
 
     return (
         <div
