@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import l from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CTM_Colors } from "../Helper";
+import pb from "../api/pocketbase";
 
 const icon = l.icon({
     iconUrl: "https://cdn-icons-png.freepik.com/512/2/2013.png",
@@ -47,8 +48,12 @@ const LiveMap: React.FC = () => {
     const mapRef = useRef<L.Map | null>(null);
     const markerRef = useRef<L.Marker | null>(null);
     const polyRef = useRef<L.Polyline | null>(null);
-
     const [path, setPath] = useState<[number, number][]>([]);
+
+    const [startFinish, setStartFinish] = useState<[number, number] | null>(null);
+    const [lapTimes, setLapTimes] = useState<number[]>([]);
+    const lastCrossTime = useRef<number | null>(null);
+
 
     useEffect(() => {
         async function loadLog() {
@@ -67,6 +72,20 @@ const LiveMap: React.FC = () => {
 
                 if (!mapRef.current) {
                     mapRef.current = l.map("map").setView(gps[0], 17);
+
+                    mapRef.current.on("click", (e: any) => {
+                        const point: [number, number] = [e.latlng.lat, e.latlng.lng];
+                        setStartFinish(point);
+
+                        // Startpunkt sichtbar machen
+                        l.circleMarker(point, {
+                            radius: 8,
+                            color: "red",
+                            weight: 3
+                        }).addTo(mapRef.current!);
+
+                        console.log("Start/Ziel gesetzt:", point);
+                    });
 
                     l.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
                         attribution: "© OpenStreetMap contributors",
@@ -97,10 +116,74 @@ const LiveMap: React.FC = () => {
     useEffect(() => {
         if (path.length === 0) return;
 
-        if (markerRef.current) markerRef.current.setLatLng(path[path.length - 1]);
-        if (polyRef.current) polyRef.current.setLatLngs(path);
-        mapRef.current?.setView(path[path.length - 1]);
-    }, [path]);
+        let index = 0;
+
+        const interval = setInterval(() => {
+            if (!markerRef.current || !mapRef.current) return;
+            if (index >= path.length) {
+                clearInterval(interval);
+                return;
+            }
+            const pos = path[index];
+
+            if (startFinish) {
+                const dist = Math.sqrt(
+                    Math.pow(pos[0] - startFinish[0], 2) +
+                    Math.pow(pos[1] - startFinish[1], 2)
+                );
+
+
+                // DEBUG: Prüfe ob wir nahe genug sind
+                console.log("DEBUG - Distance:", dist, "Threshold: 0.00005", "Within range:", dist < 0.00005);
+
+                if (dist < 0.00002) { // 5 m Radius
+                    const now = performance.now();
+
+                    if (lastCrossTime.current !== null) {
+                        const lapTimeMs = now - lastCrossTime.current;
+                        console.log("DEBUG - Lap time calculated:", lapTimeMs, "ms");
+
+                        setLapTimes(prev => [...prev, lapTimeMs]);
+
+                        localStorage.setItem("latestLap", lapTimeMs.toString());
+                        localStorage.setItem("lapTimeStamp", Date.now().toString());
+
+
+                        console.log("Runde beendet:", lapTimeMs / 1000, "s");
+
+                        pb.collection("laps").create({
+                            driver: "Driver",
+                            lapTime: (lapTimeMs / 1000).toFixed(3),
+                            timeStamp: new Date().toISOString(),
+                            cones: 0,
+                        })
+                            .then(() => {
+                                console.log("Lap saved to PocketBase");
+                            })
+                            .catch((err) => {
+                                console.error("Error saving lap:", err);
+                            });
+                    }
+
+                    lastCrossTime.current = now;
+                }
+            }
+
+            // Marker bewegen
+            markerRef.current.setLatLng(pos);
+
+            // Karte folgen
+            // mapRef.current.setView(pos);
+
+            if (polyRef.current) {
+                polyRef.current.setLatLngs(path.slice(0, index + 1));
+            }
+
+            index++;
+        }, 150);
+
+        return () => clearInterval(interval);
+    }, [path, startFinish]); // startFinish als Dependency hinzufügen
 
     return (
         <div
