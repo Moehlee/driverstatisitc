@@ -205,6 +205,7 @@ const LiveMap: React.FC = () => {
                         localStorage.setItem("lapTimeStamp", Date.now().toString());
 
                         localStorage.setItem("sectorTimes", JSON.stringify(finalSectorTimes));
+                        localStorage.setItem("sectorCount", JSON.stringify(sectors.length));
 
                         console.log("Runde beendet:", lapTimeMs / 1000, "s");
                         console.log("Sektorzeiten:", finalSectorTimes.map(time => (time / 1000).toFixed(3)));
@@ -215,7 +216,8 @@ const LiveMap: React.FC = () => {
                             lapTime: (lapTimeMs / 1000).toFixed(3),
                             timeStamp: new Date().toISOString(),
                             cones: 0,
-                            sectors: finalSectorTimes.map(time => (time / 1000).toFixed(3))
+                            sectors: finalSectorTimes.map(time => (time / 1000).toFixed(3)),
+                            sectorCount: sectors.length + 1
                         })
                             .then(() => {
                                 console.log("Lap saved to PocketBase");

@@ -19,6 +19,7 @@ interface LocalLap {
     time: number;
     timeStamp: number;
     sectors?: number[]; // Sektorzeiten in ms
+    sectorCount?: number;
 }
 
 const LiveTiming: React.FC = () => {
@@ -54,6 +55,7 @@ const LiveTiming: React.FC = () => {
             const t = localStorage.getItem("latestLap");
             const ts = localStorage.getItem("lapTimeStamp");
             const sectorTimesStr = localStorage.getItem("sectorTimes");
+            const sectorCountStr = localStorage.getItem("sectorCount");
 
             if (t !== null && ts !== null) {
                 const newLap: LocalLap = {
@@ -70,6 +72,14 @@ const LiveTiming: React.FC = () => {
                     }
                 }
 
+                if (sectorCountStr) {
+                    try {
+                        newLap.sectorCount = JSON.parse(sectorCountStr);
+                    } catch (e) {
+                        console.error("Error parsing sector count:", e);
+                    }
+                }
+
                 setLocalLaps(prev => [
                     ...prev,
                     newLap
@@ -78,6 +88,7 @@ const LiveTiming: React.FC = () => {
                 localStorage.removeItem("latestLap");
                 localStorage.removeItem("lapTimeStamp");
                 localStorage.removeItem("sectorTimes");
+                localStorage.removeItem("sectorCount");
             }
         }, 500);
 
@@ -124,7 +135,6 @@ const LiveTiming: React.FC = () => {
                 ) : (
                     laps.map((lap) => (
                         <Box key={lap.id}>
-                            {/* Haupt-Rundenzeit */}
                             <Box
                                 sx={{
                                     display: "flex",
@@ -137,9 +147,15 @@ const LiveTiming: React.FC = () => {
                                 <Typography fontWeight="bold">{lap.driver}</Typography>
                                 <Typography fontWeight="bold">{lap.lapTime}s</Typography>
                                 <Typography>Cones: {lap.cones}</Typography>
+                                {lap.sectorCount && (
+                                    <Typography variant="body2">
+                                        Sektoren: {lap.sectorCount}
+                                    </Typography>
+                                )}
                                 <Typography variant="body2">
                                     {new Date(lap.timeStamp).toLocaleTimeString()}
                                 </Typography>
+
                             </Box>
 
                             {lap.sectors && lap.sectors.length > 0 && (
@@ -177,7 +193,6 @@ const LiveTiming: React.FC = () => {
                 )}
             </Box>
 
-            {/* Local Lap Times mit Sektoren */}
             <Box
                 sx={{
                     border: 1,
@@ -189,7 +204,7 @@ const LiveTiming: React.FC = () => {
                 }}
             >
                 <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
-                    Local Lap Times (Demo)
+                    Local Lap Times
                 </Typography>
 
                 {localLaps.length === 0 ? (
@@ -207,8 +222,13 @@ const LiveTiming: React.FC = () => {
                                     backgroundColor: 'rgba(255,0,0,0.05)',
                                 }}
                             >
-                                <Typography>Demo Driver</Typography>
+                                <Typography>Driver</Typography>
                                 <Typography fontWeight="bold">{(lap.time / 1000).toFixed(3)}s</Typography>
+                                {lap.sectorCount && (
+                                    <Typography variant="body2">
+                                        Sektoren: {lap.sectorCount}
+                                    </Typography>
+                                )}
                                 <Typography variant="body2">
                                     {new Date(lap.timeStamp).toLocaleTimeString()}
                                 </Typography>
