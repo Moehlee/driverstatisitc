@@ -207,12 +207,15 @@ const LiveMap: React.FC = () => {
                         localStorage.setItem("sectorTimes", JSON.stringify(finalSectorTimes));
                         localStorage.setItem("sectorCount", JSON.stringify(sectors.length));
 
-                        console.log("Runde beendet:", lapTimeMs / 1000, "s");
-                        console.log("Sektorzeiten:", finalSectorTimes.map(time => (time / 1000).toFixed(3)));
-                        console.log("Summe Sektorzeiten:", finalSectorTimes.reduce((a, b) => a + b, 0) / 1000, "s");
+                        const selectedDriverId = localStorage.getItem("selectedDriverId")
+
+                        if (!selectedDriverId){
+                            console.log("no driver selected ")
+                            return;
+                        }
 
                         pb.collection("laps").create({
-                            driver: "Driver",
+                            driver: selectedDriverId,
                             lapTime: (lapTimeMs / 1000).toFixed(3),
                             timeStamp: new Date().toISOString(),
                             cones: 0,
