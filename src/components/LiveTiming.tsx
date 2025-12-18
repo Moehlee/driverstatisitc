@@ -182,6 +182,16 @@ const LiveTiming: React.FC = () => {
 
     const sectorColors = ["#6bb5ff", "#4ECDC4", "#45B7D1", "#96CEB4", "#FFEAA7", "#DDA0DD"];
 
+    //  Local Laps nach Zeit schnellste
+    const sortedLocalLaps = [...localLaps]
+        .filter(lap => lap.time > 0) // Nur gültige Runden
+        .sort((a, b) => a.time - b.time); // Aufsteigend
+
+    // Finde die schnellste Runde
+    const fastestLapTime = sortedLocalLaps.length > 0
+        ? sortedLocalLaps[0].time
+        : null;
+
     return (
         <Grid
             container
@@ -283,8 +293,9 @@ const LiveTiming: React.FC = () => {
                                     <Typography fontWeight="bold">{lap.lapTime}s</Typography>
                                     <Typography>Cones: {lap.cones}</Typography>
                                     {lap.sectorCount && (
+
                                         <Typography variant="body2">
-                                            Sektoren: {lap.sectorCount}
+                                            Sectors: {lap.sectorCount}
                                         </Typography>
                                     )}
                                     <Typography variant="body2">
@@ -294,12 +305,13 @@ const LiveTiming: React.FC = () => {
 
                                 {lap.sectors && lap.sectors.length > 0 && (
                                     <Box sx={{
+
                                         padding: 1,
                                         backgroundColor: 'rgba(0,0,0,0.02)',
                                         borderBottom: "1px solid rgba(255,255,255,0.05)",
                                     }}>
                                         <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                            Sektorzeiten:
+                                            Sectortimes:
                                         </Typography>
                                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                             {lap.sectors.map((sectorTime, index) => (
@@ -328,6 +340,7 @@ const LiveTiming: React.FC = () => {
                 )}
             </Box>
 
+            {/* Local Lap Times  */}
             <Box
                 sx={{
                     border: 1,
@@ -338,15 +351,29 @@ const LiveTiming: React.FC = () => {
                     mb: 3,
                 }}
             >
-                <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
-                    Local Lap Times (Demo)
-                </Typography>
+                <Box sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    mb: 2
+                }}>
+                    <Typography variant="h6">
+                        Local Lap Times (Demo)
+                    </Typography>
+                    {fastestLapTime && (
+                        <Typography variant="body2" sx={{ color: '#800080', fontWeight: 'bold' }}>
+                            Fastest: {(fastestLapTime / 1000).toFixed(3)}s
+                        </Typography>
+                    )}
+                </Box>
 
-                {localLaps.length === 0 ? (
+                {sortedLocalLaps.length === 0 ? (
                     <Typography textAlign="center">No local laps yet</Typography>
                 ) : (
-                    localLaps.map((lap, i) => {
+                    sortedLocalLaps.map((lap, i) => {
                         const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+                        const isFastest = fastestLapTime && lap.time === fastestLapTime;
+
                         return (
                             <Box key={i}>
                                 <Box
@@ -356,16 +383,65 @@ const LiveTiming: React.FC = () => {
                                         alignItems: "center",
                                         padding: 1,
                                         borderBottom: "1px solid rgba(255,255,255,0.1)",
-                                        backgroundColor: 'rgba(255,0,0,0.05)',
+                                        backgroundColor: isFastest
+                                            ? 'rgba(128, 0, 128, 0.2)' // Lila/Purple für schnellste Runde
+                                            : i % 2 === 0
+                                                ? 'rgba(255,0,0,0.05)'
+                                                : 'rgba(255,0,0,0.02)',
+                                        borderLeft: isFastest ? '4px solid #800080' : 'none',
                                     }}
                                 >
-                                    <Typography fontWeight="bold" sx={{ color: selectedDriver?.color }}>
-                                        {selectedDriver?.name || "Driver"}
-                                    </Typography>
-                                    <Typography fontWeight="bold">{(lap.time / 1000).toFixed(3)}s</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Box
+                                            sx={{
+                                                width: 24,
+                                                height: 24,
+                                                borderRadius: '50%',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                backgroundColor: isFastest ? '#800080' : '#666',
+                                                color: 'white',
+                                                fontSize: '0.75rem',
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            {i + 1}
+                                        </Box>
+                                        <Typography fontWeight="bold" sx={{ color: selectedDriver?.color }}>
+                                            {selectedDriver?.name || "Unkknown Driver"}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography
+                                            fontWeight="bold"
+                                            sx={{
+                                                fontSize: isFastest ? '1.1rem' : '1rem',
+                                                color: isFastest ? '#800080' : 'inherit'
+                                            }}
+                                        >
+                                            {(lap.time / 1000).toFixed(3)}s
+                                        </Typography>
+                                        {isFastest && (
+                                            <Box
+                                                sx={{
+                                                    backgroundColor: '#800080',
+                                                    color: 'white',
+                                                    padding: '0 6px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 'bold'
+                                                }}
+                                            >
+                                                FASTEST
+                                            </Box>
+                                        )}
+                                    </Box>
+
                                     {lap.sectorCount && (
                                         <Typography variant="body2">
-                                            Sektoren: {lap.sectorCount}
+                                            Sectors: {lap.sectorCount}
                                         </Typography>
                                     )}
                                     <Typography variant="body2">
@@ -376,11 +452,13 @@ const LiveTiming: React.FC = () => {
                                 {lap.sectors && lap.sectors.length > 0 && (
                                     <Box sx={{
                                         padding: 1,
-                                        backgroundColor: 'rgba(255,0,0,0.02)',
+                                        backgroundColor: isFastest
+                                            ? 'rgba(128, 0, 128, 0.1)'
+                                            : 'rgba(255,0,0,0.02)',
                                         borderBottom: "1px solid rgba(255,255,255,0.05)",
                                     }}>
                                         <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                            Sektorzeiten:
+                                            Sectoritmes:
                                         </Typography>
                                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                             {lap.sectors.map((sectorTime, index) => (
@@ -390,7 +468,9 @@ const LiveTiming: React.FC = () => {
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         padding: '2px 8px',
-                                                        backgroundColor: sectorColors[index % sectorColors.length],
+                                                        backgroundColor: isFastest
+                                                            ? '#800080' // Lila für schnellste Runde
+                                                            : sectorColors[index % sectorColors.length],
                                                         borderRadius: '12px',
                                                         fontSize: '0.75rem',
                                                         color: 'white',
@@ -408,6 +488,33 @@ const LiveTiming: React.FC = () => {
                     })
                 )}
             </Box>
+
+
+            {/* Fastest Lap Summary */}
+            {fastestLapTime && (
+                <Box
+                    sx={{
+                        border: 2,
+                        borderColor: '#800080',
+                        borderRadius: 1,
+                        width: "80%",
+                        padding: 2,
+                        mb: 3,
+                        backgroundColor: 'rgba(128, 0, 128, 0.1)',
+                        textAlign: 'center'
+                    }}
+                >
+                    <Typography variant="h6" sx={{ color: '#800080', mb: 1 }}>
+                        Fastest Lap
+                    </Typography>
+                    <Typography variant="h4" sx={{ color: '#800080', fontWeight: 'bold' }}>
+                        {(fastestLapTime / 1000).toFixed(3)} seconds
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: '#800080', mt: 1 }}>
+                        Driver: {drivers.find(d => d.id === selectedDriverId)?.name || "Unknown Driver"}
+                    </Typography>
+                </Box>
+            )}
 
             <Button
                 variant="contained"

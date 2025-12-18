@@ -16,8 +16,8 @@ const RunDetailPage = () => {
                     <LiveMap />
                 </Box>
                 <Box sx={{ flex: 1 }}>
+                    <StatView/>
                     <LiveTiming />
-
                 </Box>
             </Box>
         </Box>

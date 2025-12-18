@@ -66,7 +66,7 @@ const LiveMap: React.FC = () => {
                 const gps = parseGpsFromLog(text);
 
                 if (gps.length === 0) {
-                    console.warn(" Keine GPS-Daten in Logdatei gefunden.");
+                    console.warn(" no gps data");
                     return;
                 }
 
@@ -91,10 +91,10 @@ const LiveMap: React.FC = () => {
                                 fillColor: "blue",
                                 fillOpacity: 0.5
                             })
-                                .bindPopup(`Sektor ${sectors.length + 1}`)
+                                .bindPopup(`Sector ${sectors.length + 1}`)
                                 .addTo(mapRef.current!);
 
-                            console.log(`Sektor ${sectors.length + 1} gesetzt:`, point);
+                            console.log(`Sector ${sectors.length + 1} placed:`, point);
                         } else {
                             // Start/Ziel setzen
                             setStartFinish(point);
@@ -106,7 +106,7 @@ const LiveMap: React.FC = () => {
                                 weight: 3
                             }).addTo(mapRef.current!);
 
-                            console.log("Start/Ziel gesetzt:", point);
+                            console.log("Start/Finish placed:", point);
                         }
                     });
 
@@ -129,7 +129,7 @@ const LiveMap: React.FC = () => {
                     });
                 }
             } catch (e) {
-                console.error("Fehler beim Laden der Logdatei:", e);
+                console.error("Logdatei error:", e);
             }
         }
 
