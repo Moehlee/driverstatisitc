@@ -358,7 +358,7 @@ const LiveTiming: React.FC = () => {
                     mb: 2
                 }}>
                     <Typography variant="h6">
-                        Local Lap Times (Demo)
+                        Local Lap Times
                     </Typography>
                     {fastestLapTime && (
                         <Typography variant="body2" sx={{ color: '#800080', fontWeight: 'bold' }}>
@@ -488,33 +488,6 @@ const LiveTiming: React.FC = () => {
                     })
                 )}
             </Box>
-
-
-            {/* Fastest Lap Summary */}
-            {fastestLapTime && (
-                <Box
-                    sx={{
-                        border: 2,
-                        borderColor: '#800080',
-                        borderRadius: 1,
-                        width: "80%",
-                        padding: 2,
-                        mb: 3,
-                        backgroundColor: 'rgba(128, 0, 128, 0.1)',
-                        textAlign: 'center'
-                    }}
-                >
-                    <Typography variant="h6" sx={{ color: '#800080', mb: 1 }}>
-                        Fastest Lap
-                    </Typography>
-                    <Typography variant="h4" sx={{ color: '#800080', fontWeight: 'bold' }}>
-                        {(fastestLapTime / 1000).toFixed(3)} seconds
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: '#800080', mt: 1 }}>
-                        Driver: {drivers.find(d => d.id === selectedDriverId)?.name || "Unknown Driver"}
-                    </Typography>
-                </Box>
-            )}
 
             <Button
                 variant="contained"

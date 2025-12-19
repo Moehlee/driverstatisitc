@@ -19,6 +19,8 @@ import {
 } from "@mui/material";
 import { CTM_Colors } from "../Helper";
 import pb from "../api/pocketbase";
+import SimpleLineChart from "./SimpleLineChart";
+import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
 
 interface Driver {
     id: string;
@@ -54,6 +56,9 @@ const Statistics: React.FC = () => {
     const [driverStats, setDriverStats] = useState<DriverStat[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const [allLaps, setAllLaps] = useState<LapData[]>([]);
+    const [tabValue, setTabValue] = useState(0);
+
     useEffect(() => {
         loadAllData();
     }, []);
@@ -63,7 +68,7 @@ const Statistics: React.FC = () => {
             // Lade alle Daten
             const [driverRecords, lapRecords] = await Promise.all([
                 pb.collection("drivers").getFullList(),
-                pb.collection("laps").getFullList({ expand: "driver" })
+                pb.collection("laps").getFullList({ expand: "driver" , sort: "timeStamp"})
             ]);
 
             setDrivers(driverRecords as any);
@@ -71,6 +76,7 @@ const Statistics: React.FC = () => {
             if (driverRecords.length > 0) {
                 setSelectedDriverId(driverRecords[0].id);
             }
+            setAllLaps(lapRecords as any);
 
             // Berechne Statistiken
             calculateStats(lapRecords as any, driverRecords as any);
@@ -125,6 +131,7 @@ const Statistics: React.FC = () => {
         return driverStats.find(stats => stats.driverId === selectedDriverId);
     };
 
+
     if (loading) {
         return (
             <Box sx={{ p: 3 }}>
@@ -135,6 +142,24 @@ const Statistics: React.FC = () => {
     }
 
     const selectedDriver = getSelectedDriverLaps();
+
+    const getChartData = () => {
+        if (!selectedDriverId) return []; // Kein Fahrer ausgewählt
+
+        const driverLaps = allLaps
+            .filter(lap => lap.driver === selectedDriverId)
+            .sort((a, b) => new Date(a.timeStamp).getTime() - new Date(b.timeStamp).getTime());
+
+        return driverLaps.map((lap, index) => ({
+            lap: index + 1,
+            time: parseFloat(lap.lapTime),
+            cones: lap.cones || 0,
+            date: new Date(lap.timeStamp).toLocaleTimeString()
+        }));
+    };
+
+    const chartData = getChartData();
+
 
     return (
         <Box sx={{ p: 3, maxWidth: 1200, margin: '0 auto' }}>
@@ -368,6 +393,45 @@ const Statistics: React.FC = () => {
                     ))}
                 </Box>
             </Box>
+            {/* Graph */}
+            {chartData.length > 0 && (
+                <Box sx={{ mb: 6 }}>
+                    <Typography variant="h5" gutterBottom sx={{ mb: 1 }}>
+                        Lap Time Progression
+                    </Typography>
+                    <Card>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis
+                                        dataKey="lap"
+                                        label={{ value: 'Lap Number', position: 'insideBottom', offset: -5 }}
+                                    />
+                                    <YAxis
+                                        label={{ value: 'Time (s)', angle: -90, position: 'insideLeft' }}
+                                        domain={['auto', 'auto']}
+                                    />
+                                    <Tooltip
+                                        formatter={(value) => [`${value}s`, 'Lap Time']}
+                                        labelFormatter={(label) => `Lap ${label}`}
+                                    />
+                                    <Legend />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="time"
+                                        stroke={selectedDriver?.color || "#8884d8"}
+                                        strokeWidth={2}
+                                        dot={{ r: 4 }}
+                                        activeDot={{ r: 6 }}
+                                        name="Lap Time"
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                </Box>
+            )}
         </Box>
     );
 };
