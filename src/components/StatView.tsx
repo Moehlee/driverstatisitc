@@ -19,8 +19,16 @@ import {
 } from "@mui/material";
 import { CTM_Colors } from "../Helper";
 import pb from "../api/pocketbase";
-import SimpleLineChart from "./SimpleLineChart";
-import {CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis} from "recharts";
+import {
+    CartesianGrid,
+    Legend,
+    Line,
+    LineChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis
+} from "recharts";
 
 interface Driver {
     id: string;
@@ -50,14 +58,16 @@ interface DriverStat {
     totalCones: number;
 }
 
-const Statistics: React.FC = () => {
+interface StatViewProps {
+    showAllDriversInGraph?: boolean;
+}
+
+const StatView: React.FC<StatViewProps> = ({ showAllDriversInGraph = false }) => {
     const [drivers, setDrivers] = useState<Driver[]>([]);
     const [selectedDriverId, setSelectedDriverId] = useState<string>("");
     const [driverStats, setDriverStats] = useState<DriverStat[]>([]);
     const [loading, setLoading] = useState(true);
-
     const [allLaps, setAllLaps] = useState<LapData[]>([]);
-    const [tabValue, setTabValue] = useState(0);
 
     useEffect(() => {
         loadAllData();
@@ -65,10 +75,9 @@ const Statistics: React.FC = () => {
 
     const loadAllData = async () => {
         try {
-            // Lade alle Daten
             const [driverRecords, lapRecords] = await Promise.all([
                 pb.collection("drivers").getFullList(),
-                pb.collection("laps").getFullList({ expand: "driver" , sort: "timeStamp"})
+                pb.collection("laps").getFullList({ expand: "driver", sort: "timeStamp" })
             ]);
 
             setDrivers(driverRecords as any);
@@ -78,7 +87,6 @@ const Statistics: React.FC = () => {
             }
             setAllLaps(lapRecords as any);
 
-            // Berechne Statistiken
             calculateStats(lapRecords as any, driverRecords as any);
         } catch (err) {
             console.error("Error loading data:", err);
@@ -91,7 +99,6 @@ const Statistics: React.FC = () => {
         const stats: DriverStat[] = [];
 
         drivers.forEach(driver => {
-            // Alle Runden dieses Fahrers
             const driverLaps = laps.filter(lap => lap.driver === driver.id);
 
             if (driverLaps.length === 0) {
@@ -107,7 +114,6 @@ const Statistics: React.FC = () => {
                 return;
             }
 
-            // Zeiten extrahieren
             const lapTimes = driverLaps.map(lap => parseFloat(lap.lapTime));
             const bestTime = Math.min(...lapTimes);
             const avgTime = lapTimes.reduce((sum, time) => sum + time, 0) / lapTimes.length;
@@ -131,20 +137,9 @@ const Statistics: React.FC = () => {
         return driverStats.find(stats => stats.driverId === selectedDriverId);
     };
 
-
-    if (loading) {
-        return (
-            <Box sx={{ p: 3 }}>
-                <LinearProgress />
-                <Typography sx={{ mt: 2 }}>Loading statistics...</Typography>
-            </Box>
-        );
-    }
-
-    const selectedDriver = getSelectedDriverLaps();
-
-    const getChartData = () => {
-        if (!selectedDriverId) return []; // Kein Fahrer ausgewählt
+    // Daten für Single Driver Graph
+    const getSingleDriverChartData = () => {
+        if (!selectedDriverId) return [];
 
         const driverLaps = allLaps
             .filter(lap => lap.driver === selectedDriverId)
@@ -158,47 +153,110 @@ const Statistics: React.FC = () => {
         }));
     };
 
-    const chartData = getChartData();
+    // Daten für All Drivers Graph (NEU)
+    const getAllDriversChartData = () => {
+        if (drivers.length === 0) return [];
 
+        // Für jeden Fahrer die Runden sammeln
+        const allDriverData = drivers.map(driver => {
+            const driverLaps = allLaps
+                .filter(lap => lap.driver === driver.id)
+                .sort((a, b) => new Date(a.timeStamp).getTime() - new Date(b.timeStamp).getTime())
+                .map((lap, index) => ({
+                    lap: index + 1,
+                    time: parseFloat(lap.lapTime),
+                    driverName: driver.name,
+                    driverColor: driver.color
+                }));
+
+            return driverLaps;
+        });
+
+        // Finde maximale Rundenanzahl
+        const maxLaps = Math.max(...allDriverData.map(d => d.length));
+
+        // Kombiniere alle Daten
+        const combinedData = [];
+        for (let lapNum = 1; lapNum <= maxLaps; lapNum++) {
+            const lapData: any = { lap: lapNum };
+
+            drivers.forEach(driver => {
+                const driverData = allDriverData.find(d => d[0]?.driverName === driver.name);
+                const lap = driverData?.find(d => d.lap === lapNum);
+
+                if (lap) {
+                    lapData[driver.name] = lap.time;
+                }
+            });
+
+            combinedData.push(lapData);
+        }
+
+        return combinedData;
+    };
+
+    if (loading) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <LinearProgress />
+                <Typography sx={{ mt: 2 }}>Loading statistics...</Typography>
+            </Box>
+        );
+    }
+
+    const selectedDriver = getSelectedDriverLaps();
+    const singleChartData = getSingleDriverChartData();
+    const allChartData = getAllDriversChartData();
 
     return (
         <Box sx={{ p: 3, maxWidth: 1200, margin: '0 auto' }}>
-            {/* Header */}
             <Box sx={{ mb: 4 }}>
                 <Typography variant="h4" fontWeight="bold" color={CTM_Colors.black}>
                     Driver Statistics
                 </Typography>
             </Box>
 
-            {/* Driver Selection */}
-            <Box sx={{ mb: 4 }}>
-                <FormControl sx={{ minWidth: 300 }}>
-                    <InputLabel>Select Driver for Details</InputLabel>
-                    <Select
-                        value={selectedDriverId}
-                        label="Select Driver for Details"
-                        onChange={(e) => setSelectedDriverId(e.target.value)}
-                    >
-                        {drivers.map((driver) => (
-                            <MenuItem key={driver.id} value={driver.id}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                    <Box
-                                        sx={{
-                                            width: 20,
-                                            height: 20,
-                                            backgroundColor: driver.color,
-                                            borderRadius: '50%'
-                                        }}
-                                    />
-                                    <Typography>{driver.name}</Typography>
-                                </Box>
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
+            {/* Driver Selection (nur im Single Mode anzeigen) */}
+            {!showAllDriversInGraph && (
+                <Box sx={{ mb: 4 }}>
+                    <FormControl sx={{ minWidth: 300 }}>
+                        <InputLabel>Select Driver for Details</InputLabel>
+                        <Select
+                            value={selectedDriverId}
+                            label="Select Driver for Details"
+                            onChange={(e) => setSelectedDriverId(e.target.value)}
+                        >
+                            {drivers.map((driver) => (
+                                <MenuItem key={driver.id} value={driver.id}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Box
+                                            sx={{
+                                                width: 20,
+                                                height: 20,
+                                                backgroundColor: driver.color,
+                                                borderRadius: '50%'
+                                            }}
+                                        />
+                                        <Typography>{driver.name}</Typography>
+                                    </Box>
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
+            )}
+
+            {/* Info Text über den Graph */}
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="h6" color={CTM_Colors.ctm_green}>
+                    {showAllDriversInGraph
+                        ? "Showing all drivers comparison"
+                        : `Showing ${selectedDriver?.name || "selected driver"}`
+                    }
+                </Typography>
             </Box>
 
-            {selectedDriver && (
+            {selectedDriver && !showAllDriversInGraph && (
                 <Box sx={{
                     display: 'flex',
                     flexWrap: 'wrap',
@@ -250,6 +308,69 @@ const Statistics: React.FC = () => {
                             <Typography variant="h4" color={selectedDriver.color}>
                                 {selectedDriver.totalCones}
                             </Typography>
+                        </CardContent>
+                    </Card>
+                </Box>
+            )}
+
+            {/* Graph Section */}
+            {((showAllDriversInGraph && allChartData.length > 0) || (!showAllDriversInGraph && singleChartData.length > 0)) && (
+                <Box sx={{ mb: 6 }}>
+                    <Typography variant="h5" gutterBottom sx={{ mb: 1 }}>
+                        {showAllDriversInGraph ? "All Drivers Lap Times" : "Lap Time Progression"}
+                    </Typography>
+                    <Card>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={300}>
+                                <LineChart data={showAllDriversInGraph ? allChartData : singleChartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis
+                                        dataKey="lap"
+                                        label={{ value: 'Lap Number', position: 'insideBottom', offset: -5 }}
+                                    />
+                                    <YAxis
+                                        label={{ value: 'Time (s)', angle: -90, position: 'insideLeft' }}
+                                        domain={['auto', 'auto']}
+                                    />
+                                    <Tooltip
+                                        formatter={(value, name) => {
+                                            if (showAllDriversInGraph) {
+                                                return [`${value}s`, name];
+                                            }
+                                            return [`${value}s`, 'Lap Time'];
+                                        }}
+                                        labelFormatter={(label) => `Lap ${label}`}
+                                    />
+                                    <Legend />
+
+                                    {showAllDriversInGraph ? (
+                                        // Alle Fahrer als separate Linien
+                                        drivers.map(driver => (
+                                            <Line
+                                                key={driver.id}
+                                                type="monotone"
+                                                dataKey={driver.name}
+                                                stroke={driver.color}
+                                                strokeWidth={2}
+                                                dot={{ r: 4 }}
+                                                activeDot={{ r: 6 }}
+                                                name={driver.name}
+                                            />
+                                        ))
+                                    ) : (
+                                        // Nur ausgewählter Fahrer
+                                        <Line
+                                            type="monotone"
+                                            dataKey="time"
+                                            stroke={selectedDriver?.color || "#8884d8"}
+                                            strokeWidth={2}
+                                            dot={{ r: 4 }}
+                                            activeDot={{ r: 6 }}
+                                            name="Lap Time"
+                                        />
+                                    )}
+                                </LineChart>
+                            </ResponsiveContainer>
                         </CardContent>
                     </Card>
                 </Box>
@@ -320,48 +441,8 @@ const Statistics: React.FC = () => {
                     </Table>
                 </TableContainer>
             </Box>
-
-            {/* Graph */}
-            {chartData.length > 0 && (
-                <Box sx={{ mb: 6 }}>
-                    <Typography variant="h5" gutterBottom sx={{ mb: 1 }}>
-                        Lap Time Progression
-                    </Typography>
-                    <Card>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={300}>
-                                <LineChart data={chartData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis
-                                        dataKey="lap"
-                                        label={{ value: 'Lap Number', position: 'insideBottom', offset: -5 }}
-                                    />
-                                    <YAxis
-                                        label={{ value: 'Time (s)', angle: -90, position: 'insideLeft' }}
-                                        domain={['auto', 'auto']}
-                                    />
-                                    <Tooltip
-                                        formatter={(value) => [`${value}s`, 'Lap Time']}
-                                        labelFormatter={(label) => `Lap ${label}`}
-                                    />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="time"
-                                        stroke={selectedDriver?.color || "#8884d8"}
-                                        strokeWidth={2}
-                                        dot={{ r: 4 }}
-                                        activeDot={{ r: 6 }}
-                                        name="Lap Time"
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </CardContent>
-                    </Card>
-                </Box>
-            )}
         </Box>
     );
 };
 
-export default Statistics;
+export default StatView;
