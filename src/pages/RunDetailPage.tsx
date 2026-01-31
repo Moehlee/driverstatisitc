@@ -13,6 +13,7 @@ import LiveMap from "../components/LiveMap";
 import LiveTiming from "../components/LiveTiming";
 import StatView from "../components/StatView";
 import { CTM_Colors } from "../Helper";
+import Leaderboard from "../components/Leaderboard";
 
 const RunDetailPage = () => {
     const { id } = useParams();
@@ -132,6 +133,9 @@ const RunDetailPage = () => {
                         )}
                     </Box>
                 </Paper>
+                <Box sx={{ mt: 4 }}>
+                    <Leaderboard />
+                </Box>
             </Box>
         </Box>
     );
