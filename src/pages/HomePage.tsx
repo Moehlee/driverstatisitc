@@ -2,6 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Box, Typography, Button } from "@mui/material";
 import {CTM_Colors} from "../Helper";
+import SpiderChart from "../components/SpiderChart";
 
 const disciplines = [
     { name: "Acceleration", color: "CTM_Colors.ctm_green" },
@@ -38,6 +39,9 @@ const HomePage = () => {
                         {disc.name}
                     </Button>
                 ))}
+            </Box>
+            <Box sx={{ mt: 4 }}>
+                <SpiderChart />
             </Box>
         </Box>
     );

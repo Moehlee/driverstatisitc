@@ -133,9 +133,6 @@ const RunDetailPage = () => {
                         )}
                     </Box>
                 </Paper>
-                <Box sx={{ mt: 4 }}>
-                    <Leaderboard />
-                </Box>
             </Box>
         </Box>
     );

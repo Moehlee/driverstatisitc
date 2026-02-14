@@ -29,6 +29,7 @@ import {
     XAxis,
     YAxis
 } from "recharts";
+import Leaderboard from "./Leaderboard";
 
 interface Driver {
     id: string;
@@ -440,6 +441,9 @@ const StatView: React.FC<StatViewProps> = ({ showAllDriversInGraph = false }) =>
                         </TableBody>
                     </Table>
                 </TableContainer>
+            </Box>
+            <Box sx={{ mt: 4 }}>
+                <Leaderboard />
             </Box>
         </Box>
     );
