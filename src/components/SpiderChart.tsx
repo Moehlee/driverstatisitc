@@ -16,7 +16,8 @@ import {
     PolarAngleAxis,
     PolarRadiusAxis,
     Tooltip,
-    ResponsiveContainer
+    ResponsiveContainer,
+    Legend
 } from 'recharts';
 
 interface Driver {
@@ -29,13 +30,15 @@ interface LapData {
     id: string;
     driver: string;
     lapTime: string;
-    cones: number;
+    discipline: string;
 }
 
 const SpiderChart: React.FC = () => {
-    const [drivers, setDrivers] = useState<Driver[]>([]);
-    const [driverData, setDriverData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [chartData, setChartData] = useState<any[]>([]);
+    const [drivers, setDrivers] = useState<Driver[]>([]);
+
+    const disciplines = ["Acceleration", "Skidpad", "Endurance", "Efficiency"];
 
     useEffect(() => {
         loadData();
@@ -44,53 +47,64 @@ const SpiderChart: React.FC = () => {
     const loadData = async () => {
         try {
             // Lade alle Fahrer
-            const driverRecords = await pb.collection("drivers").getFullList();
-            setDrivers(driverRecords as any);
+            const driverRecords = await pb.collection("drivers").getFullList() as Driver[];
+            setDrivers(driverRecords);
 
             // Lade alle Runden
-            const lapRecords = await pb.collection("laps").getFullList();
+            const lapRecords = await pb.collection("laps").getFullList() as LapData[];
 
-            // Berechne für jeden Fahrer die Metriken
-            const data = driverRecords.map((driver: any) => {
-                const driverLaps = lapRecords.filter((lap: any) => lap.driver === driver.id);
+            // Für jeden Fahrer die beste Zeit pro Disziplin finden
+            const driverPerformances = driverRecords.map(driver => {
+                const driverLaps = lapRecords.filter(lap => lap.driver === driver.id);
 
-                if (driverLaps.length === 0) {
-                    return {
-                        name: driver.name,
-                        color: driver.color,
-                        Speed: 0,
-                        Consistency: 0,
-                        'Clean Laps': 0
-                    };
-                }
-
-                // Durchschnittliche Rundenzeit
-                const lapTimes = driverLaps.map((lap: any) => parseFloat(lap.lapTime));
-                const avgTime = lapTimes.reduce((a, b) => a + b, 0) / lapTimes.length;
-
-                // Speed Score (je kleiner die Zeit, desto besser)
-                const fastestTime = Math.min(...lapTimes);
-                const speedScore = Math.round((fastestTime / avgTime) * 100);
-
-                // Consistency (Standardabweichung)
-                const variance = lapTimes.reduce((acc, time) => acc + Math.pow(time - avgTime, 2), 0) / lapTimes.length;
-                const stdDev = Math.sqrt(variance);
-                const consistencyScore = Math.round(100 - (stdDev * 10));
-
-                // Clean Laps
-                const cleanLaps = driverLaps.filter((lap: any) => !lap.cones || lap.cones === 0).length;
-                const cleanScore = Math.round((cleanLaps / driverLaps.length) * 100);
-
-                return {
+                // Daten für RadarChart: Jede Disziplin bekommt einen Wert
+                const performance: any = {
                     name: driver.name,
-                    color: driver.color,
-                    Speed: Math.min(100, speedScore),
-                    Consistency: Math.min(100, consistencyScore),
-                    'Clean Laps': cleanScore
+                    color: driver.color
                 };
+
+                // Für jede Disziplin die beste Zeit holen
+                disciplines.forEach(discipline => {
+                    const disciplineLaps = driverLaps
+                        .filter(lap => lap.discipline === discipline)
+                        .map(lap => parseFloat(lap.lapTime));
+
+                    if (disciplineLaps.length > 0) {
+                        // Beste Zeit für diese Disziplin
+                        const bestTime = Math.min(...disciplineLaps);
+                        // Normalisieren: Je kleiner die Zeit, desto besser
+                        // 100% = beste Zeit, 0% = schlechteste
+                        performance[discipline] = 100; // Placeholder, wird später normalisiert
+                        performance[`${discipline}_raw`] = bestTime;
+                    } else {
+                        performance[discipline] = 0;
+                        performance[`${discipline}_raw`] = null;
+                    }
+                });
+
+                return performance;
             });
 
-            setDriverData(data);
+            // Normalisiere die Werte (beste Zeit = 100%)
+            disciplines.forEach(discipline => {
+                // Finde die beste Zeit aller Fahrer für diese Disziplin
+                const allTimes = driverPerformances
+                    .map(p => p[`${discipline}_raw`])
+                    .filter(t => t !== null) as number[];
+
+                if (allTimes.length > 0) {
+                    const bestOverallTime = Math.min(...allTimes);
+
+                    // Setze normalisierte Werte (beste Zeit = 100, andere relativ dazu)
+                    driverPerformances.forEach(p => {
+                        if (p[`${discipline}_raw`]) {
+                            p[discipline] = Math.round((bestOverallTime / p[`${discipline}_raw`]) * 100);
+                        }
+                    });
+                }
+            });
+
+            setChartData(driverPerformances);
         } catch (err) {
             console.error("Error loading data:", err);
         } finally {
@@ -103,113 +117,110 @@ const SpiderChart: React.FC = () => {
             <Card>
                 <CardContent>
                     <LinearProgress />
-                    <Typography sx={{ mt: 2 }}>Loading driver data...</Typography>
+                    <Typography sx={{ mt: 2 }}>Loading...</Typography>
                 </CardContent>
             </Card>
         );
     }
 
-    if (drivers.length === 0) {
+    if (chartData.length === 0) {
         return (
             <Card>
                 <CardContent>
-                    <Typography>No drivers found. Add drivers first.</Typography>
+                    <Typography>No data available</Typography>
                 </CardContent>
             </Card>
         );
     }
 
-    // @ts-ignore
     return (
         <Card>
             <CardContent>
                 <Typography variant="h5" gutterBottom sx={{ fontWeight: 'bold', mb: 3 }}>
-                     Driver Performance Overview
+                    Who's good at what?
                 </Typography>
 
-                {/* Spider Chart */}
-                <ResponsiveContainer width="100%" height={400}>
-                    <RadarChart data={driverData}>
+                <ResponsiveContainer width="100%" height={500}>
+                    <RadarChart data={chartData}>
                         <PolarGrid />
-                        <PolarAngleAxis dataKey="name" tick={{ fill: '#666', fontSize: 12 }} />
-                        <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fill: '#999' }} />
+                        <PolarAngleAxis
+                            dataKey="name"
+                            tick={{ fill: '#666', fontSize: 12 }}
+                        />
+                        <PolarRadiusAxis
+                            angle={30}
+                            domain={[0, 100]}
+                            tick={{ fill: '#999' }}
+                        />
                         <Tooltip
-                            formatter={(value: any) => [`${value}%`, 'Score']}
-                            contentStyle={{ backgroundColor: 'rgba(255,255,255,0.95)', borderRadius: 8 }}
+                            formatter={(value: any, name: string) => {
+                                const driver = chartData.find(d => d.name === name);
+                                if (driver) {
+                                    const rawValue = driver[`${value}raw`];
+                                    return rawValue ? [`${rawValue}s`, name] : ['No data', name];
+                                }
+                                return [`${value}%`, name];
+                            }}
                         />
+                        <Legend />
 
-                        {/* Speed Radar */}
-                        <Radar
-                            name="Speed"
-                            dataKey="Speed"
-                            stroke="#FF6B6B"
-                            fill="#FF6B6B"
-                            fillOpacity={0.3}
-                        />
-
-                        {/* Consistency Radar */}
-                        <Radar
-                            name="Consistency"
-                            dataKey="Consistency"
-                            stroke="#4ECDC4"
-                            fill="#4ECDC4"
-                            fillOpacity={0.3}
-                        />
-
-                        {/* Clean Laps Radar */}
-                        <Radar
-                            name="Clean Laps"
-                            dataKey="Clean Laps"
-                            stroke="#45B7D1"
-                            fill="#45B7D1"
-                            fillOpacity={0.3}
-                        />
+                        {/* Für jede Disziplin einen Radar */}
+                        {disciplines.map((discipline, index) => {
+                            const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#DDA0DD'];
+                            return (
+                                <Radar
+                                    key={discipline}
+                                    name={discipline}
+                                    dataKey={discipline}
+                                    stroke={colors[index % colors.length]}
+                                    fill={colors[index % colors.length]}
+                                    fillOpacity={0.2}
+                                />
+                            );
+                        })}
                     </RadarChart>
                 </ResponsiveContainer>
 
-                {/* Einfache Legende */}
-                <Box sx={{ display: 'flex', justifyContent: 'center', gap: 3, mt: 3 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 16, height: 16, backgroundColor: '#FF6B6B', borderRadius: 1 }} />
-                        <Typography>Speed</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 16, height: 16, backgroundColor: '#4ECDC4', borderRadius: 1 }} />
-                        <Typography>Consistency</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Box sx={{ width: 16, height: 16, backgroundColor: '#45B7D1', borderRadius: 1 }} />
-                        <Typography>Clean Laps</Typography>
-                    </Box>
-                </Box>
+                {/* Einfache Erklärung */}
+                <Box sx={{ mt: 3, display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center' }}>
+                    {disciplines.map((discipline, index) => {
+                        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#DDA0DD'];
+                        // Finde den besten Fahrer in dieser Disziplin
+                        const bestDriver = [...chartData]
+                            .filter(d => d[discipline] > 0)
+                            .sort((a, b) => b[discipline] - a[discipline])[0];
 
-                {/* Einfache Tabelle */}
-                <Box sx={{ mt: 4, overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                        <thead>
-                        <tr style={{ backgroundColor: '#f5f5f5' }}>
-                            <th style={{ padding: '10px', textAlign: 'left' }}>Driver</th>
-                            <th style={{ padding: '10px', textAlign: 'center' }}>Speed</th>
-                            <th style={{ padding: '10px', textAlign: 'center' }}>Consistency</th>
-                            <th style={{ padding: '10px', textAlign: 'center' }}>Clean</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {driverData.map((driver) => (
-                            <tr key={driver.name} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={{ padding: '8px' }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Box sx={{ width: 10, height: 10, backgroundColor: driver.color, borderRadius: '50%' }} />
-                                        {driver.name}
+                        return (
+                            <Box
+                                key={discipline}
+                                sx={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 1,
+                                    p: 1,
+                                    borderLeft: `3px solid ${colors[index % colors.length]}`,
+                                    bgcolor: '#f8f9fa',
+                                    borderRadius: 1
+                                }}
+                            >
+                                <Typography variant="body2" fontWeight="bold">
+                                    {discipline}:
+                                </Typography>
+                                {bestDriver ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                        <Box sx={{ width: 10, height: 10, bgcolor: bestDriver.color, borderRadius: '50%' }} />
+                                        <Typography variant="body2" sx={{ color: bestDriver.color }}>
+                                            {bestDriver.name}
+                                        </Typography>
                                     </Box>
-                                </td>
-                                <td align="center">{driver.Speed}%</td>
-                                <td align="center">{driver.Consistency}%</td>
-                                <td align="center">{driver['Clean Laps']}%</td>
-                            </tr>
-                        ))}
-                        </tbody>
-                    </table>
+                                ) : (
+                                    <Typography variant="body2" color="textSecondary">
+                                        No data
+                                    </Typography>
+                                )}
+                            </Box>
+                        );
+                    })}
                 </Box>
             </CardContent>
         </Card>

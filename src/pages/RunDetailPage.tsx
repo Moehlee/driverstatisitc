@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import { useParams } from "react-router-dom";
 import {
     Box,
@@ -7,7 +7,7 @@ import {
     Switch,
     FormControlLabel,
     ButtonGroup,
-    Paper
+    Paper, MenuItem, FormControl, InputLabel, Select
 } from "@mui/material";
 import LiveMap from "../components/LiveMap";
 import LiveTiming from "../components/LiveTiming";
@@ -19,6 +19,11 @@ const RunDetailPage = () => {
     const { id } = useParams();
     const [showStats, setShowStats] = useState(false);
     const [showAllDriversInGraph, setShowAllDriversInGraph] = useState(false);
+    const [discipline, setDiscipline] = useState("Endurance");
+
+    useEffect(() => {
+        localStorage.setItem("selectedDiscipline", discipline);
+    }, [discipline]);
 
     return (
         <Box sx={{ p: 3, height: "100vh" }}>
@@ -30,6 +35,25 @@ const RunDetailPage = () => {
                 <Typography variant="body2" sx={{ opacity: 0.7 }}>
                     Live telemetry, lap timing and performance analysis
                 </Typography>
+            </Box>
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h4">Run {id}</Typography>
+
+                {/* dropdown für Disziplin */}
+                <FormControl sx={{ minWidth: 200 }}>
+                    <InputLabel>Discipline</InputLabel>
+                    <Select
+                        value={discipline}
+                        onChange={(e) => setDiscipline(e.target.value)}
+                        label="Discipline"
+                    >
+                        <MenuItem value="Acceleration">Acceleration</MenuItem>
+                        <MenuItem value="Skidpad">Skidpad</MenuItem>
+                        <MenuItem value="Endurance">Endurance</MenuItem>
+                        <MenuItem value="Efficiency">Efficiency</MenuItem>
+                    </Select>
+                </FormControl>
             </Box>
 
             {/* Main Toggle */}

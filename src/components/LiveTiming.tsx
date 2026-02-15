@@ -50,6 +50,7 @@ const LiveTiming: React.FC = () => {
     const [openDriverModal, setOpenDriverModal] = useState(false);
     const [newDriverName, setNewDriverName] = useState("");
     const [newDriverColor, setNewDriverColor] = useState("#6bb5ff");
+    const [discipline, setDiscipline] = useState("Endurance");
 
     // Farbpalette für Driver
     const colorPalette = [
@@ -76,6 +77,7 @@ const LiveTiming: React.FC = () => {
                 const records = await pb.collection("laps").getFullList(50, {
                     sort: "-created",
                     expand: "driver",
+                    filter: `discipline="${discipline}"`
 
                 });
                 setLaps(records as any);
@@ -142,7 +144,7 @@ const LiveTiming: React.FC = () => {
             clearInterval(timer);
             pb.collection("laps").unsubscribe("*");
         };
-    }, []);
+    }, [discipline]);
 
     const handleCreateDriver = async () => {
         if (!newDriverName.trim()) {

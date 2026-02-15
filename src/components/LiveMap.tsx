@@ -208,6 +208,7 @@ const LiveMap: React.FC = () => {
                         localStorage.setItem("sectorCount", JSON.stringify(sectors.length));
 
                         const selectedDriverId = localStorage.getItem("selectedDriverId")
+                        const selectedDiscipline = localStorage.getItem("selectedDiscipline") || "Acceleration";
 
                         if (!selectedDriverId){
                             console.log("no driver selected ")
@@ -220,7 +221,8 @@ const LiveMap: React.FC = () => {
                             timeStamp: new Date().toISOString(),
                             cones: 0,
                             sectors: finalSectorTimes.map(time => (time / 1000).toFixed(3)),
-                            sectorCount: sectors.length + 1
+                            sectorCount: sectors.length + 1,
+                            discipline: selectedDiscipline
                         })
                             .then(() => {
                                 console.log("Lap saved to PocketBase");
