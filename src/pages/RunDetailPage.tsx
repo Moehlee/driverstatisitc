@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
     Box,
@@ -7,19 +7,28 @@ import {
     Switch,
     FormControlLabel,
     ButtonGroup,
-    Paper, MenuItem, FormControl, InputLabel, Select
+    Paper,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    Select,
+    Card,
+    CardContent,
+    Grid
 } from "@mui/material";
+import { DataProvider, useData } from "../contexts/DataContext";
 import LiveMap from "../components/LiveMap";
 import LiveTiming from "../components/LiveTiming";
 import StatView from "../components/StatView";
 import { CTM_Colors } from "../Helper";
-import Leaderboard from "../components/Leaderboard";
 
-const RunDetailPage = () => {
+const RunContent = () => {
     const { id } = useParams();
     const [showStats, setShowStats] = useState(false);
     const [showAllDriversInGraph, setShowAllDriversInGraph] = useState(false);
     const [discipline, setDiscipline] = useState("Endurance");
+
+    const { latestTemp, gpsPoints, loading } = useData();
 
     useEffect(() => {
         localStorage.setItem("selectedDiscipline", discipline);
@@ -37,23 +46,38 @@ const RunDetailPage = () => {
                 </Typography>
             </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h4">Run {id}</Typography>
+            {/* Temperatur-Anzeige */}
+            {latestTemp && (
+                <Box sx={{
+                    display: 'flex',
+                    gap: 2,
+                    mb: 3,
+                    p: 1.5,
+                    bgcolor: '#f5f5f5',
+                    borderRadius: 1,
+                    fontSize: '0.9rem'
+                }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 8, height: 8, bgcolor: '#ff6b6b', borderRadius: '50%' }} />
+                        <span>Temp: <strong>{latestTemp.temp.toFixed(1)}°C</strong></span>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 8, height: 8, bgcolor: '#4ecdc4', borderRadius: '50%' }} />
+                        <span>Luftfeuchtigkeit: <strong>{latestTemp.hum.toFixed(1)}%</strong></span>
+                    </Box>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ width: 8, height: 8, bgcolor: '#45b7d1', borderRadius: '50%' }} />
+                        <span>Asphalt: <strong>{latestTemp.tempA.toFixed(1)}°C</strong></span>
+                    </Box>
+                </Box>
+            )}
 
-                {/* dropdown für Disziplin */}
-                <FormControl sx={{ minWidth: 200 }}>
-                    <InputLabel>Discipline</InputLabel>
-                    <Select
-                        value={discipline}
-                        onChange={(e) => setDiscipline(e.target.value)}
-                        label="Discipline"
-                    >
-                        <MenuItem value="Acceleration">Acceleration</MenuItem>
-                        <MenuItem value="Skidpad">Skidpad</MenuItem>
-                        <MenuItem value="Endurance">Endurance</MenuItem>
-                        <MenuItem value="Efficiency">Efficiency</MenuItem>
-                    </Select>
-                </FormControl>
+            {/* GPS Info */}
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="body2">
+                     GPS Punkte: {gpsPoints.length} |
+                    {gpsPoints.length > 0 && ` Letzter: ${gpsPoints[gpsPoints.length-1].lat.toFixed(6)}, ${gpsPoints[gpsPoints.length-1].lon.toFixed(6)}`}
+                </Typography>
             </Box>
 
             {/* Main Toggle */}
@@ -85,6 +109,20 @@ const RunDetailPage = () => {
                         Statistics
                     </Button>
                 </ButtonGroup>
+
+                <FormControl sx={{ minWidth: 200, ml: 2 }}>
+                    <InputLabel>Discipline</InputLabel>
+                    <Select
+                        value={discipline}
+                        onChange={(e) => setDiscipline(e.target.value)}
+                        label="Discipline"
+                    >
+                        <MenuItem value="Acceleration">Acceleration</MenuItem>
+                        <MenuItem value="Skidpad">Skidpad</MenuItem>
+                        <MenuItem value="Endurance">Endurance</MenuItem>
+                        <MenuItem value="Efficiency">Efficiency</MenuItem>
+                    </Select>
+                </FormControl>
             </Box>
 
             {/* Layout */}
@@ -93,7 +131,7 @@ const RunDetailPage = () => {
                     display: "grid",
                     gridTemplateColumns: "1.2fr 1fr",
                     gap: 3,
-                    height: "calc(100vh - 160px)",
+                    height: "calc(100vh - 280px)",
                 }}
             >
                 {/* Map */}
@@ -159,6 +197,15 @@ const RunDetailPage = () => {
                 </Paper>
             </Box>
         </Box>
+    );
+};
+
+// Hauptkomponente mit DataProvider
+const RunDetailPage = () => {
+    return (
+        <DataProvider>
+            <RunContent />
+        </DataProvider>
     );
 };
 

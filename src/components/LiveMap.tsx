@@ -3,6 +3,7 @@ import l from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { CTM_Colors } from "../Helper";
 import pb from "../api/pocketbase";
+import { useData } from "../contexts/DataContext";
 
 const icon = l.icon({
     iconUrl: "https://cdn-icons-png.freepik.com/512/2/2013.png",
@@ -10,137 +11,88 @@ const icon = l.icon({
     iconAnchor: [5, 5],
 });
 
-function decodeCanGps(hexString: string): [number, number] {
-    const payload = hexString.includes("#")
-        ? hexString.split("#")[1]
-        : hexString;
-
-    const bytes = Uint8Array.from(
-        payload.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
-    );
-
-    const latRaw = new DataView(bytes.buffer).getInt32(0, true);
-    const lonRaw = new DataView(bytes.buffer).getInt32(4, true);
-
-    return [ latRaw / 1e7, lonRaw / 1e7];
-}
-
-// Log Parser
-function parseGpsFromLog(text: string): [number, number][] {
-    const lines = text.split("\n");
-    const gps: [number, number][] = [];
-
-    const regex = /can-gps\s+[0-9A-Fa-f]+#([0-9A-Fa-f]{16})/;
-
-    for (const line of lines) {
-        const match = line.match(regex);
-        if (!match) continue;
-
-        const hex = match[1];
-        const coords = decodeCanGps(hex);
-        if (coords) gps.push(coords);
-    }
-    return gps;
-}
-
 const LiveMap: React.FC = () => {
+    const { gpsPoints } = useData();
+
     const mapRef = useRef<L.Map | null>(null);
     const markerRef = useRef<L.Marker | null>(null);
     const polyRef = useRef<L.Polyline | null>(null);
-    const [path, setPath] = useState<[number, number][]>([]);
 
+    const [path, setPath] = useState<[number, number][]>([]);
     const [startFinish, setStartFinish] = useState<[number, number] | null>(null);
     const [sectors, setSectors] = useState<[number, number][]>([]);
     const [lapTimes, setLapTimes] = useState<number[]>([]);
+
     const lastCrossTime = useRef<number | null>(null);
     const sectorTimesRef = useRef<number[]>([]);
     const currentSectorRef = useRef<number>(0);
-    const sectorCrossTimes = useRef<number[]>([]); // Neue Referenz für Sektor-Zeitstempel
+    const sectorCrossTimes = useRef<number[]>([]);
 
+    // Pfad aus DataContext aktualisieren
     useEffect(() => {
-        async function loadLog() {
-            try {
-                const res = await fetch("/runs/demo.log");
-                const text = await res.text();
-
-                const gps = parseGpsFromLog(text);
-
-                if (gps.length === 0) {
-                    console.warn(" no gps data");
-                    return;
-                }
-
-                setPath(gps);
-
-                if (!mapRef.current) {
-                    mapRef.current = l.map("map").setView(gps[0], 17);
-
-                    mapRef.current.on("click", (e: any) => {
-                        const point: [number, number] = [e.latlng.lat, e.latlng.lng];
-
-                        // Strg + Linksklick = Sektor, normaler Linksklick = Start/Ziel
-                        if (e.originalEvent.ctrlKey) {
-                            // Sektor hinzufügen
-                            setSectors(prev => [...prev, point]);
-
-                            // Sektor anzeigen
-                            l.circleMarker(point, {
-                                radius: 6,
-                                color: "blue",
-                                weight: 3,
-                                fillColor: "blue",
-                                fillOpacity: 0.5
-                            })
-                                .bindPopup(`Sector ${sectors.length + 1}`)
-                                .addTo(mapRef.current!);
-
-                            console.log(`Sector ${sectors.length + 1} placed:`, point);
-                        } else {
-                            // Start/Ziel setzen
-                            setStartFinish(point);
-
-                            // Startpunkt sichtbar machen
-                            l.circleMarker(point, {
-                                radius: 8,
-                                color: "red",
-                                weight: 3
-                            }).addTo(mapRef.current!);
-
-                            console.log("Start/Finish placed:", point);
-                        }
-                    });
-
-                    l.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                        attribution: "© OpenStreetMap contributors",
-                    }).addTo(mapRef.current);
-
-                    markerRef.current = l.marker(gps[0], { icon }).addTo(mapRef.current);
-                    polyRef.current = l.polyline(gps, {
-                        color: CTM_Colors.ctm_green,
-                        weight: 4,
-                    }).addTo(mapRef.current);
-
-                    gps.forEach((pos) => {
-                        l.circleMarker(pos, {
-                            radius: 4,
-                            color: "#1c9600",
-                            weight: 2
-                        }).addTo(mapRef.current!);
-                    });
-                }
-            } catch (e) {
-                console.error("Logdatei error:", e);
-            }
+        if (gpsPoints.length > 0) {
+            const newPath = gpsPoints.map(p => [p.lat, p.lon] as [number, number]);
+            setPath(newPath);
         }
+    }, [gpsPoints]);
 
-        loadLog();
-    }, []);
+    // Karte initialisieren
+    useEffect(() => {
+        if (path.length === 0 || mapRef.current) return;
 
+        mapRef.current = l.map("map").setView(path[0], 17);
+
+        mapRef.current.on("click", (e: any) => {
+            const point: [number, number] = [e.latlng.lat, e.latlng.lng];
+
+            if (e.originalEvent.ctrlKey) {
+                setSectors(prev => [...prev, point]);
+                l.circleMarker(point, {
+                    radius: 6,
+                    color: "blue",
+                    weight: 3,
+                    fillColor: "blue",
+                    fillOpacity: 0.5
+                })
+                    .bindPopup(`Sector ${sectors.length + 1}`)
+                    .addTo(mapRef.current!);
+                console.log(`Sector ${sectors.length + 1} placed:`, point);
+            } else {
+                setStartFinish(point);
+                l.circleMarker(point, {
+                    radius: 8,
+                    color: "red",
+                    weight: 3
+                }).addTo(mapRef.current!);
+                console.log("Start/Finish placed:", point);
+            }
+        });
+
+        l.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+            attribution: "© OpenStreetMap contributors",
+        }).addTo(mapRef.current);
+
+        markerRef.current = l.marker(path[0], { icon }).addTo(mapRef.current);
+        polyRef.current = l.polyline(path, {
+            color: CTM_Colors.ctm_green,
+            weight: 4,
+        }).addTo(mapRef.current);
+
+        path.forEach((pos) => {
+            l.circleMarker(pos, {
+                radius: 4,
+                color: "#1c9600",
+                weight: 2
+            }).addTo(mapRef.current!);
+        });
+
+    }, [path]);
+
+    // Animation und Rundenzeiten (bleibt gleich)
     useEffect(() => {
         if (path.length === 0) return;
 
         let index = 0;
-
         const interval = setInterval(() => {
             if (!markerRef.current || !mapRef.current) return;
             if (index >= path.length) {
@@ -182,38 +134,27 @@ const LiveMap: React.FC = () => {
                     if (lastCrossTime.current !== null) {
                         const lapTimeMs = now - lastCrossTime.current;
 
-                        // Korrekte Sektorzeit-Berechnung
                         const finalSectorTimes: number[] = [];
 
-                        // Start bis Sektor 1
                         if (sectors.length > 0) {
                             finalSectorTimes[0] = sectorCrossTimes.current[0] - lastCrossTime.current;
-
-                            //Sektor i bis Sektor i+1
                             for (let i = 1; i < sectors.length; i++) {
                                 finalSectorTimes[i] = sectorCrossTimes.current[i] - sectorCrossTimes.current[i-1];
                             }
-
-                            // Lletzter Sektor bis Start/Ziel
                             finalSectorTimes[sectors.length] = now - sectorCrossTimes.current[sectors.length-1];
                         }
 
-                        console.log("DEBUG - Lap time calculated:", lapTimeMs, "ms");
                         setLapTimes(prev => [...prev, lapTimeMs]);
 
                         localStorage.setItem("latestLap", lapTimeMs.toString());
                         localStorage.setItem("lapTimeStamp", Date.now().toString());
-
                         localStorage.setItem("sectorTimes", JSON.stringify(finalSectorTimes));
                         localStorage.setItem("sectorCount", JSON.stringify(sectors.length));
 
-                        const selectedDriverId = localStorage.getItem("selectedDriverId")
+                        const selectedDriverId = localStorage.getItem("selectedDriverId");
                         const selectedDiscipline = localStorage.getItem("selectedDiscipline") || "Acceleration";
 
-                        if (!selectedDriverId){
-                            console.log("no driver selected ")
-                            return;
-                        }
+                        if (!selectedDriverId) return;
 
                         pb.collection("laps").create({
                             driver: selectedDriverId,
@@ -223,13 +164,7 @@ const LiveMap: React.FC = () => {
                             sectors: finalSectorTimes.map(time => (time / 1000).toFixed(3)),
                             sectorCount: sectors.length + 1,
                             discipline: selectedDiscipline
-                        })
-                            .then(() => {
-                                console.log("Lap saved to PocketBase");
-                            })
-                            .catch((err) => {
-                                console.error("Error saving lap:", err);
-                            });
+                        });
                     }
 
                     lastCrossTime.current = now;
@@ -239,16 +174,10 @@ const LiveMap: React.FC = () => {
                 }
             }
 
-            // Marker bewegen
             markerRef.current.setLatLng(pos);
-
-            // Karte folgen
-            // mapRef.current.setView(pos);
-
             if (polyRef.current) {
                 polyRef.current.setLatLngs(path.slice(0, index + 1));
             }
-
             index++;
         }, 150);
 
