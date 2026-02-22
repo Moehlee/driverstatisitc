@@ -54,32 +54,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return [latRaw / 1e7, lonRaw / 1e7];
     };
 
-    const decodeCanTemp = (hexString: string): number => {
-        const payload = hexString.split("#")[1];
+    const decodeCanTemp = (payload: string): number => {
         if (!payload || payload.length < 4) return 0;
-        const tempHex = payload.substring(0, 4);
-        return parseInt(tempHex, 16) / 10; // 7D05 = 3205 = 32.05°C
+
+        const bytes = new Uint8Array(2);
+        bytes[0] = parseInt(payload.substring(0, 2), 16);
+        bytes[1] = parseInt(payload.substring(2, 4), 16);
+
+        const value = new DataView(bytes.buffer).getInt16(0, true);
+        return value / 100;
     };
 
-    const decodeCanHum = (hexString: string): number => {
-        const payload = hexString.split("#")[1];
+    const decodeCanHum = (payload: string): number => {
         if (!payload || payload.length < 4) return 0;
-        const humHex = payload.substring(0, 4);
-        return parseInt(humHex, 16) / 100; // A00F = 4000 = 40.00%
+
+        const bytes = new Uint8Array(2);
+        bytes[0] = parseInt(payload.substring(0, 2), 16);
+        bytes[1] = parseInt(payload.substring(2, 4), 16);
+
+        const value = new DataView(bytes.buffer).getInt16(0, true);
+        return value / 100;
     };
 
-    const decodeCanTempA = (hexString: string): number => {
-        const payload = hexString.split("#")[1];
+    const decodeCanTempA = (payload: string): number => {
         if (!payload || payload.length < 4) return 0;
-        const tempHex = payload.substring(0, 4);
-        return parseInt(tempHex, 16) / 10; // 2007 = 1824 = 18.24°C
+
+        const bytes = new Uint8Array(2);
+        bytes[0] = parseInt(payload.substring(0, 2), 16);
+        bytes[1] = parseInt(payload.substring(2, 4), 16);
+
+        const value = new DataView(bytes.buffer).getInt16(0, true);
+        return value / 100;
     };
+
 
     // Log Datei laden
     const loadLogFile = async (filename: string) => {
         try {
             setLoading(true);
             setError(null);
+
+            // Arrays für die neuen Daten
+            const newGpsPoints: GpsPoint[] = [];
+            const newTemperatures: TempData[] = [];
 
             const res = await fetch(`/runs/${filename}`);
             if (!res.ok) throw new Error(`Failed to load ${filename}`);
@@ -103,11 +120,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 switch(type) {
                     case 'can-gps': {
                         const coords = decodeCanGps(data);
-                        setGpsPoints(prev => [...prev, {
+                        newGpsPoints.push({
                             timestamp,
                             lat: coords[0],
                             lon: coords[1]
-                        }]);
+                        });
                         break;
                     }
                     case 'can-temp': {
@@ -139,14 +156,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         hum: currentTemp.hum
                     };
 
-                    setTemperatures(prev => [...prev, tempData]);
-                    setLatestTemp(tempData);
-
+                    newTemperatures.push(tempData);
                     currentTemp = {};
                 }
             });
 
-            console.log(`Geladen: ${gpsPoints.length} GPS, ${temperatures.length} Temperatur`);
+            // ALLE Daten auf einmal setzen (viel effizienter!)
+            setGpsPoints(newGpsPoints);
+            setTemperatures(newTemperatures);
+
+            if (newTemperatures.length > 0) {
+                setLatestTemp(newTemperatures[newTemperatures.length - 1]);
+            }
+
+            console.log(`Geladen: ${newGpsPoints.length} GPS, ${newTemperatures.length} Temperatur`);
+            console.log("Erster Temperaturwert:", newTemperatures[0]);
+            console.log("Letzter Temperaturwert:", newTemperatures[newTemperatures.length - 1]);
 
         } catch (err) {
             setError(`Fehler beim Laden: ${err}`);
