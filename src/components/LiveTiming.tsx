@@ -8,12 +8,16 @@ import {
     FormControl,
     InputLabel,
     Modal,
-    TextField
+    TextField,
+    Collapse,
+    IconButton
 } from "@mui/material";
 import Grid from "@mui/material/Grid";
 import { toast } from "react-toastify";
 import { CTM_Colors } from "../Helper";
 import pb from "../api/pocketbase";
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 interface Driver {
     id: string;
@@ -51,6 +55,7 @@ const LiveTiming: React.FC = () => {
     const [newDriverName, setNewDriverName] = useState("");
     const [newDriverColor, setNewDriverColor] = useState("#6bb5ff");
     const [discipline, setDiscipline] = useState("Endurance");
+    const [expanded, setExpanded] = useState(false);
 
     // Farbpalette für Driver
     const colorPalette = [
@@ -261,86 +266,106 @@ const LiveTiming: React.FC = () => {
                 </Box>
             </Box>
 
-            <Box
-                sx={{
-                    border: 1,
-                    borderColor: CTM_Colors.ctm_green,
-                    borderRadius: 1,
-                    width: "80%",
-                    padding: 2,
-                    mb: 3,
-                }}>
-                <Typography variant="h6" sx={{ mb: 2, textAlign: 'center' }}>
-                    Server Lap Times
-                </Typography>
-                {laps.length === 0 ? (
-                    <Typography textAlign="center">No laps recorded yet</Typography>
-                ) : (
-                    laps.map((lap) => {
-                        const driver = lap.expand?.driver || drivers.find(d => d.id === lap.driver);
-                        return (
-                            <Box key={lap.id}>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        justifyContent: "space-between",
-                                        alignItems: "center",
-                                        padding: 1,
-                                        borderBottom: "1px solid rgba(255,255,255,0.1)",
-                                        backgroundColor: 'rgba(0,0,0,0.05)',
-                                    }}>
-                                    <Typography fontWeight="bold" sx={{ color: driver?.color }}>
-                                        {driver?.name || "Unknown Driver"}
-                                    </Typography>
-                                    <Typography fontWeight="bold">{lap.lapTime}s</Typography>
-                                    <Typography>Cones: {lap.cones}</Typography>
-                                    {lap.sectorCount && (
+            <Box sx={{ width: "80%", mb: 3 }}>
+                {/* Header zum Einklappen */}
+                <Box
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        mb: 1,
+                        '&:hover': { opacity: 0.8 }
+                    }}
+                    onClick={() => setExpanded(!expanded)}
+                >
+                    <Typography variant="h6" sx={{ color: CTM_Colors.ctm_green, fontWeight: 'bold' }}>
+                        Server Lap Times
+                    </Typography>
+                    <IconButton size="small" sx={{ color: CTM_Colors.ctm_green }}>
+                        {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                    </IconButton>
+                </Box>
 
-                                        <Typography variant="body2">
-                                            Sectors: {lap.sectorCount}
-                                        </Typography>
-                                    )}
-                                    <Typography variant="body2">
-                                        {new Date(lap.timeStamp).toLocaleTimeString()}
-                                    </Typography>
-                                </Box>
-
-                                {lap.sectors && lap.sectors.length > 0 && (
-                                    <Box sx={{
-
-                                        padding: 1,
-                                        backgroundColor: 'rgba(0,0,0,0.02)',
-                                        borderBottom: "1px solid rgba(255,255,255,0.05)",
-                                    }}>
-                                        <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                            Sectortimes:
-                                        </Typography>
-                                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                            {lap.sectors.map((sectorTime, index) => (
-                                                <Box
-                                                    key={index}
-                                                    sx={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        padding: '2px 8px',
-                                                        backgroundColor: sectorColors[index % sectorColors.length],
-                                                        borderRadius: '12px',
-                                                        fontSize: '0.75rem',
-                                                        color: 'white',
-                                                        fontWeight: 'bold'
-                                                    }}
-                                                >
-                                                    S{index + 1}: {sectorTime}s
-                                                </Box>
-                                            ))}
+                {/* Einklappbarer Inhalt */}
+                <Collapse in={expanded}>
+                    <Box
+                        sx={{
+                            border: 1,
+                            borderColor: CTM_Colors.ctm_green,
+                            borderRadius: 1,
+                            width: "100%",
+                            padding: 2,
+                        }}>
+                        {laps.length === 0 ? (
+                            <Typography textAlign="center">No laps recorded yet</Typography>
+                        ) : (
+                            laps.map((lap) => {
+                                const driver = lap.expand?.driver || drivers.find(d => d.id === lap.driver);
+                                return (
+                                    <Box key={lap.id}>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                alignItems: "center",
+                                                padding: 1,
+                                                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                                                backgroundColor: 'rgba(0,0,0,0.05)',
+                                            }}>
+                                            <Typography fontWeight="bold" sx={{ color: driver?.color }}>
+                                                {driver?.name || "Unknown Driver"}
+                                            </Typography>
+                                            <Typography fontWeight="bold">{lap.lapTime}s</Typography>
+                                            <Typography>Cones: {lap.cones}</Typography>
+                                            {lap.sectorCount && (
+                                                <Typography variant="body2">
+                                                    Sectors: {lap.sectorCount}
+                                                </Typography>
+                                            )}
+                                            <Typography variant="body2">
+                                                {new Date(lap.timeStamp).toLocaleTimeString()}
+                                            </Typography>
                                         </Box>
+
+                                        {lap.sectors && lap.sectors.length > 0 && (
+                                            <Box sx={{
+                                                padding: 1,
+                                                backgroundColor: 'rgba(0,0,0,0.02)',
+                                                borderBottom: "1px solid rgba(255,255,255,0.05)",
+                                            }}>
+                                                <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                                                    Sectortimes:
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                                    {lap.sectors.map((sectorTime, index) => (
+                                                        <Box
+                                                            key={index}
+                                                            sx={{
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                padding: '2px 8px',
+                                                                backgroundColor: sectorColors[index % sectorColors.length],
+                                                                borderRadius: '12px',
+                                                                fontSize: '0.75rem',
+                                                                color: 'white',
+                                                                fontWeight: 'bold'
+                                                            }}
+                                                        >
+                                                            S{index + 1}: {sectorTime}s
+                                                        </Box>
+                                                    ))}
+                                                </Box>
+                                            </Box>
+                                        )}
                                     </Box>
-                                )}
-                            </Box>
-                        );
-                    })
-                )}
+                                );
+                            })
+                        )}
+                    </Box>
+                </Collapse>
             </Box>
+
 
             {/* Local Lap Times  */}
             <Box
