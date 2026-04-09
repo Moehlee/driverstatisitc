@@ -11,6 +11,7 @@ import HomePage from "./pages/HomePage";
 import DisciplinePage from "./pages/DisciplinePage";
 import RunDetailPage from "./pages/RunDetailPage";
 import GPSTrackViewer from "./components/GPSTrackViewer";
+import LiveDataPage from "./pages/LiveDataPage";
 
 const dark_theme = createTheme({
     palette: {
@@ -85,6 +86,7 @@ const App = () => {
                     <Route path="/discipline/:name" element={<DisciplinePage/>} />
                     <Route path="/run/:id" element={<RunDetailPage/>} />
                     <Route path="/gps-viewer" element={<GPSTrackViewer />} />
+                    <Route path="/live-data" element={<LiveDataPage />} />
                 </Routes>
                 <ToastContainer position="bottom-right" theme={isDarkmode ? "dark" : "light"}/>
         </ThemeProvider>

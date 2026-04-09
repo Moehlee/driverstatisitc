@@ -59,6 +59,13 @@ const CTMAppBar: React.FC<CTM_AppBarProps> = ({ isDarkmode, onThemeChange, logou
                     Logout
                 </Button>
 
+                <Button
+                    color="inherit"
+                    onClick={() => navigate('/live-data')}
+                >
+                    Live Data
+                </Button>
+
             </Toolbar>
         </AppBar>
     )
