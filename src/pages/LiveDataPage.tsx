@@ -10,6 +10,10 @@ import {
     CircularProgress
 } from "@mui/material";
 import { CTM_Colors } from "../Helper";
+import Collapse from '@mui/material/Collapse';
+import IconButton from '@mui/material/IconButton';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 
 interface CANData {
     timestamp: number;
@@ -21,6 +25,7 @@ const LiveDataPage: React.FC = () => {
     const [canData, setCanData] = useState<any>(null);
     const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [timeoutExpanded, setTimeoutExpanded] = useState(false);
 
     useEffect(() => {
         // WebSocket Verbindung herstellen
@@ -121,65 +126,41 @@ const LiveDataPage: React.FC = () => {
                         </CardContent>
                     </Card>
 
-                    {/* Extracted Values - ohne Grid, mit Flexbox */}
-                    {canData.values && (
-                        <Card sx={{ mb: 3 }}>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom sx={{ color: CTM_Colors.ctm_green }}>
-                                    Signal Values
-                                </Typography>
-                                <Box sx={{
-                                    display: 'flex',
-                                    flexWrap: 'wrap',
-                                    gap: 2,
-                                    mt: 2
-                                }}>
-                                    {Object.entries(canData.values).map(([key, value]: [string, any]) => (
-                                        <Box key={key} sx={{
-                                            flex: '1 1 auto',
-                                            minWidth: { xs: '100%', sm: '200px', md: '250px' }
-                                        }}>
-                                            <Paper sx={{ p: 2, backgroundColor: '#f9f9f9', height: '100%' }}>
-                                                <Typography variant="caption" color="textSecondary">
-                                                    {key}
-                                                </Typography>
-                                                <Typography variant="body1" fontWeight="bold">
-                                                    {value?.value !== undefined && value?.value !== null
-                                                        ? value.value
-                                                        : 'No data'}
-                                                </Typography>
-                                                {value?.human_format && (
-                                                    <Typography variant="caption" color="textSecondary">
-                                                        {value.human_format}
-                                                    </Typography>
-                                                )}
-                                            </Paper>
-                                        </Box>
-                                    ))}
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    )}
-
                     {/* TIMEOUT Signals */}
                     {canData.values && Object.values(canData.values).some((v: any) => v?.value === null) && (
                         <Card sx={{ backgroundColor: '#fff3e0' }}>
                             <CardContent>
-                                <Typography variant="h6" gutterBottom color="warning">
-                                    Signals with TIMEOUT
-                                </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                    {Object.entries(canData.values)
-                                        .filter(([_, v]: [string, any]) => v?.value === null)
-                                        .map(([key]) => (
-                                            <Chip
-                                                key={key}
-                                                label={key}
-                                                size="small"
-                                                sx={{ backgroundColor: '#ff9800', color: 'white' }}
-                                            />
-                                        ))}
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        cursor: 'pointer'
+                                    }}
+                                    onClick={() => setTimeoutExpanded(!timeoutExpanded)}
+                                >
+                                    <Typography variant="h6" sx={{ color: '#ff9800' }}>
+                                         Signals with TIMEOUT
+                                    </Typography>
+                                    <IconButton size="small">
+                                        {timeoutExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                                    </IconButton>
                                 </Box>
+
+                                <Collapse in={timeoutExpanded}>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 2 }}>
+                                        {Object.entries(canData.values)
+                                            .filter(([_, v]: [string, any]) => v?.value === null)
+                                            .map(([key]) => (
+                                                <Chip
+                                                    key={key}
+                                                    label={key}
+                                                    size="small"
+                                                    sx={{ backgroundColor: '#ff9800', color: 'white' }}
+                                                />
+                                            ))}
+                                    </Box>
+                                </Collapse>
                             </CardContent>
                         </Card>
                     )}
