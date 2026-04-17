@@ -112,16 +112,68 @@ const LiveDataPage: React.FC = () => {
                             <Typography variant="h6" gutterBottom sx={{ color: CTM_Colors.ctm_green }}>
                                 Raw CAN Data
                             </Typography>
+
+                            {/* Tabelle */}
                             <Box sx={{
-                                backgroundColor: '#f5f5f5',
-                                padding: 2,
-                                borderRadius: 1,
+                                maxHeight: 400,
                                 overflow: 'auto',
-                                maxHeight: 400
+                                border: '1px solid #e0e0e0',
+                                borderRadius: 1
                             }}>
-                                <pre style={{ margin: 0, fontSize: '12px' }}>
-                                    {JSON.stringify(canData, null, 2)}
-                                </pre>
+                                <table style={{
+                                    width: '100%',
+                                    borderCollapse: 'collapse',
+                                    fontSize: '13px'
+                                }}>
+                                    <thead>
+                                    <tr style={{
+                                        backgroundColor: CTM_Colors.ctm_green,
+                                        color: 'white',
+                                        position: 'sticky',
+                                        top: 0
+                                    }}>
+                                        <th style={{ padding: '10px', textAlign: 'left' }}>Signal</th>
+                                        <th style={{ padding: '10px', textAlign: 'left' }}>Value</th>
+                                        <th style={{ padding: '10px', textAlign: 'left' }}>Unit</th>
+                                        <th style={{ padding: '10px', textAlign: 'left' }}>Status</th>
+                                    </tr>
+                                    </thead>
+                                    <tbody>
+                                    {canData.values && Object.entries(canData.values).map(([key, value]: [string, any], index) => (
+                                        <tr key={key} style={{
+                                            backgroundColor: index % 2 === 0 ? '#f9f9f9' : 'white',
+                                            borderBottom: '1px solid #eee'
+                                        }}>
+                                            <td style={{ padding: '8px', fontWeight: 'bold' }}>{key}</td>
+                                            <td style={{ padding: '8px' }}>
+                                                {value?.value !== undefined && value?.value !== null
+                                                    ? value.value
+                                                    : '—'}
+                                            </td>
+                                            <td style={{ padding: '8px' }}>
+                                                {value?.unit || '—'}
+                                            </td>
+                                            <td style={{ padding: '8px' }}>
+                                                {value?.value === null ? (
+                                                    <span style={{ color: '#ff9800', fontWeight: 'bold' }}>TIMEOUT</span>
+                                                ) : (
+                                                    <span style={{ color: '#4CAF50', fontWeight: 'bold' }}>OK</span>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    </tbody>
+                                </table>
+                            </Box>
+
+                            {/* Zusammenfassung */}
+                            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+                                <Typography variant="caption" color="textSecondary">
+                                    Total Signals: {canData.values ? Object.keys(canData.values).length : 0}
+                                </Typography>
+                                <Typography variant="caption" color="textSecondary">
+                                    Timestamp: {canData.timestamp ? new Date(canData.timestamp).toLocaleTimeString() : '—'}
+                                </Typography>
                             </Box>
                         </CardContent>
                     </Card>
