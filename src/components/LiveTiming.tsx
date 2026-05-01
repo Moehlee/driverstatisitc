@@ -56,6 +56,7 @@ const LiveTiming: React.FC = () => {
     const [newDriverColor, setNewDriverColor] = useState("#6bb5ff");
     const [discipline, setDiscipline] = useState("Endurance");
     const [expanded, setExpanded] = useState(false);
+    const [localCones, setLocalCones] = useState<{ [key: number]: number }>({});
 
     // Farbpalette für Driver
     const colorPalette = [
@@ -198,6 +199,52 @@ const LiveTiming: React.FC = () => {
     const fastestLapTime = sortedLocalLaps.length > 0
         ? sortedLocalLaps[0].time
         : null;
+
+    const addCone = async (lapIndex: number, lap: LocalLap) => {
+        const currentCones = localCones[lapIndex] || 0;
+        const newCones = currentCones + 1;
+
+        setLocalCones(prev => ({
+            ...prev,
+            [lapIndex]: newCones
+        }));
+
+        const timeInSeconds = lap.time / 1000;
+        const totalTime = timeInSeconds + newCones; // +1s pro Cone
+
+        try {
+            await pb.collection("laps").create({
+                driver: selectedDriverId,
+                lapTime: totalTime.toFixed(3),
+                timeStamp: new Date().toISOString(),
+                cones: newCones,
+                sectors: lap.sectors ? lap.sectors.map(s => (s / 1000).toFixed(3)) : [],
+                sectorCount: lap.sectorCount || 0,
+                discipline: discipline
+            });
+
+            toast.success(`+1 Cone! Lap saved with ${newCones} cone(s) - Total: ${totalTime.toFixed(3)}s`);
+
+            const records = await pb.collection("laps").getFullList(50, {
+                sort: "-created",
+                expand: "driver",
+                filter: `discipline="${discipline}"`
+            });
+            setLaps(records as any);
+
+        } catch (err) {
+            console.error("Error saving lap:", err);
+            toast.error("Failed to save lap");
+        }
+    };
+
+    const getCones = (lapIndex: number): number => {
+        return localCones[lapIndex] || 0;
+    };
+
+    const getTimeWithPenalty = (timeMs: number, cones: number): number => {
+        return (timeMs / 1000) + cones;
+    };
 
     return (
         <Grid
@@ -400,6 +447,8 @@ const LiveTiming: React.FC = () => {
                     sortedLocalLaps.map((lap, i) => {
                         const selectedDriver = drivers.find(d => d.id === selectedDriverId);
                         const isFastest = fastestLapTime && lap.time === fastestLapTime;
+                        const cones = getCones(i);
+                        const totalTime = getTimeWithPenalty(lap.time, cones);
 
                         return (
                             <Box key={i}>
@@ -411,11 +460,13 @@ const LiveTiming: React.FC = () => {
                                         padding: 1,
                                         borderBottom: "1px solid rgba(255,255,255,0.1)",
                                         backgroundColor: isFastest
-                                            ? 'rgba(128, 0, 128, 0.2)' // Lila/Purple für schnellste Runde
+                                            ? 'rgba(128, 0, 128, 0.2)'
                                             : i % 2 === 0
                                                 ? 'rgba(255,0,0,0.05)'
                                                 : 'rgba(255,0,0,0.02)',
                                         borderLeft: isFastest ? '4px solid #800080' : 'none',
+                                        flexWrap: 'wrap',
+                                        gap: 1
                                     }}
                                 >
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -436,11 +487,11 @@ const LiveTiming: React.FC = () => {
                                             {i + 1}
                                         </Box>
                                         <Typography fontWeight="bold" sx={{ color: selectedDriver?.color }}>
-                                            {selectedDriver?.name || "Unkknown Driver"}
+                                            {selectedDriver?.name || "Unknown Driver"}
                                         </Typography>
                                     </Box>
 
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                         <Typography
                                             fontWeight="bold"
                                             sx={{
@@ -448,8 +499,13 @@ const LiveTiming: React.FC = () => {
                                                 color: isFastest ? '#800080' : 'inherit'
                                             }}
                                         >
-                                            {(lap.time / 1000).toFixed(3)}s
+                                            {totalTime.toFixed(3)}s
                                         </Typography>
+                                        {cones > 0 && (
+                                            <Typography variant="caption" sx={{ color: '#ff9800' }}>
+                                                (+{cones}s)
+                                            </Typography>
+                                        )}
                                         {isFastest && (
                                             <Box
                                                 sx={{
@@ -466,11 +522,33 @@ const LiveTiming: React.FC = () => {
                                         )}
                                     </Box>
 
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Button
+                                            size="small"
+                                            variant="contained"
+                                            onClick={() => addCone(i,lap)}
+                                            sx={{
+                                                minWidth: 32,
+                                                width: 32,
+                                                height: 32,
+                                                backgroundColor: CTM_Colors.ctm_green,
+                                                color: 'white',
+                                                '&:hover': { backgroundColor: CTM_Colors.grey }
+                                            }}
+                                        >
+                                            +
+                                        </Button>
+                                        <Typography variant="body2">
+                                            {cones}
+                                        </Typography>
+                                    </Box>
+
                                     {lap.sectorCount && (
                                         <Typography variant="body2">
-                                            Sectors: {lap.sectorCount}
+                                            {lap.sectorCount} sectors
                                         </Typography>
                                     )}
+
                                     <Typography variant="body2">
                                         {new Date(lap.timeStamp).toLocaleTimeString()}
                                     </Typography>
@@ -485,7 +563,7 @@ const LiveTiming: React.FC = () => {
                                         borderBottom: "1px solid rgba(255,255,255,0.05)",
                                     }}>
                                         <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
-                                            Sectoritmes:
+                                            Sector times:
                                         </Typography>
                                         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                                             {lap.sectors.map((sectorTime, index) => (
@@ -496,7 +574,7 @@ const LiveTiming: React.FC = () => {
                                                         alignItems: 'center',
                                                         padding: '2px 8px',
                                                         backgroundColor: isFastest
-                                                            ? '#800080' // Lila für schnellste Runde
+                                                            ? '#800080'
                                                             : sectorColors[index % sectorColors.length],
                                                         borderRadius: '12px',
                                                         fontSize: '0.75rem',
