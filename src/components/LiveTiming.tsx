@@ -43,6 +43,7 @@ interface LocalLap {
     timeStamp: number;
     sectors?: number[];
     sectorCount?: number;
+    driverId: string;
 }
 
 const LiveTiming: React.FC = () => {
@@ -110,12 +111,15 @@ const LiveTiming: React.FC = () => {
             const ts = localStorage.getItem("lapTimeStamp");
             const sectorTimesStr = localStorage.getItem("sectorTimes");
             const sectorCountStr = localStorage.getItem("sectorCount");
+            const currentDriver = localStorage.getItem("selectedDriverId");
 
             if (t !== null && ts !== null) {
                 const newLap: LocalLap = {
                     time: Number(t),
-                    timeStamp: Number(ts)
+                    timeStamp: Number(ts),
+                    driverId: currentDriver || "fuck"
                 };
+                console.log("New Lap Driver:", currentDriver);
 
                 // Sektorzeiten hinzufügen falls vorhanden
                 if (sectorTimesStr) {
@@ -214,7 +218,7 @@ const LiveTiming: React.FC = () => {
 
         try {
             await pb.collection("laps").create({
-                driver: selectedDriverId,
+                driver: lap.driverId,
                 lapTime: totalTime.toFixed(3),
                 timeStamp: new Date().toISOString(),
                 cones: newCones,
@@ -445,7 +449,7 @@ const LiveTiming: React.FC = () => {
                     <Typography textAlign="center">No local laps yet</Typography>
                 ) : (
                     sortedLocalLaps.map((lap, i) => {
-                        const selectedDriver = drivers.find(d => d.id === selectedDriverId);
+                        const driver = drivers.find(d=> d.id === lap.driverId);
                         const isFastest = fastestLapTime && lap.time === fastestLapTime;
                         const cones = getCones(i);
                         const totalTime = getTimeWithPenalty(lap.time, cones);
@@ -486,8 +490,8 @@ const LiveTiming: React.FC = () => {
                                         >
                                             {i + 1}
                                         </Box>
-                                        <Typography fontWeight="bold" sx={{ color: selectedDriver?.color }}>
-                                            {selectedDriver?.name || "Unknown Driver"}
+                                        <Typography fontWeight="bold" sx={{ color: driver?.color }}>
+                                            {driver?.name || "Unknown Driver"}
                                         </Typography>
                                     </Box>
 
