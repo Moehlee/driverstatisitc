@@ -4,6 +4,9 @@ import "leaflet/dist/leaflet.css";
 import { CTM_Colors } from "../Helper";
 import pb from "../api/pocketbase";
 import { useData } from "../contexts/DataContext";
+import UndoIcon from '@mui/icons-material/Undo';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import { Box, Button, Chip, Typography, Tooltip } from "@mui/material";
 
 const icon = l.icon({
     iconUrl: "https://cdn-icons-png.freepik.com/512/2/2013.png",
@@ -28,6 +31,11 @@ const LiveMap: React.FC = () => {
     const currentSectorRef = useRef<number>(0);
     const sectorCrossTimes = useRef<number[]>([]);
 
+    const [history, setHistory] = useState<{ type: 'start' | 'sector', point: [number, number] }[]>([]);
+    const [showHelp, setShowHelp] = useState(() => {
+        return localStorage.getItem('mapHelpShown') !== 'true';
+    });
+
     // Pfad aus DataContext aktualisieren
     useEffect(() => {
         if (gpsPoints.length > 0) {
@@ -47,6 +55,7 @@ const LiveMap: React.FC = () => {
 
             if (e.originalEvent.ctrlKey) {
                 setSectors(prev => [...prev, point]);
+                setHistory(prev => [...prev, { type: 'sector', point }]);
                 l.circleMarker(point, {
                     radius: 6,
                     color: "blue",
@@ -59,11 +68,14 @@ const LiveMap: React.FC = () => {
                 console.log(`Sector ${sectors.length + 1} placed:`, point);
             } else {
                 setStartFinish(point);
+                setHistory(prev => [...prev, { type: 'start', point }]);
                 l.circleMarker(point, {
                     radius: 8,
                     color: "red",
                     weight: 3
-                }).addTo(mapRef.current!);
+                })
+                    .bindPopup("Start / Finish")
+                    .addTo(mapRef.current!);
                 console.log("Start/Finish placed:", point);
             }
         });
@@ -184,15 +196,160 @@ const LiveMap: React.FC = () => {
         return () => clearInterval(interval);
     }, [path, startFinish, sectors]);
 
+    // Undo Funktion
+    const handleUndo = () => {
+        if (history.length === 0) return;
+
+        const lastAction = history[history.length - 1];
+
+        if (lastAction.type === 'start') {
+            setStartFinish(null);
+            if (mapRef.current) {
+                mapRef.current.eachLayer((layer) => {
+                    if (layer instanceof l.CircleMarker) {  // l. statt L.
+                        const popup = layer.getPopup();
+                        if (popup) {
+                            const content = popup.getContent();
+                            const contentString = typeof content === 'string' ? content : '';
+                            if (contentString.includes("Start / Finish")) {
+                                mapRef.current!.removeLayer(layer);
+                            }
+                        }
+                    }
+                });
+            }
+        } else if (lastAction.type === 'sector') {
+            setSectors(prev => prev.slice(0, -1));
+            if (mapRef.current) {
+                const sectorMarkers: l.CircleMarker[] = [];  // l. statt L.
+                mapRef.current.eachLayer((layer) => {
+                    if (layer instanceof l.CircleMarker) {  // l. statt L.
+                        const popup = layer.getPopup();
+                        if (popup) {
+                            const content = popup.getContent();
+                            const contentString = typeof content === 'string' ? content : '';
+                            if (contentString.includes("Sector")) {
+                                sectorMarkers.push(layer);
+                            }
+                        }
+                    }
+                });
+                if (sectorMarkers.length > 0) {
+                    mapRef.current.removeLayer(sectorMarkers[sectorMarkers.length - 1]);
+                }
+            }
+        }
+
+        setHistory(prev => prev.slice(0, -1));
+    };
+
+// Clear All Funktion
+    const handleClearAll = () => {
+        if (mapRef.current) {
+            const markersToRemove: l.CircleMarker[] = [];  // l. statt L.
+            mapRef.current.eachLayer((layer) => {
+                if (layer instanceof l.CircleMarker) {  // l. statt L.
+                    const popup = layer.getPopup();
+                    if (popup) {
+                        const content = popup.getContent();
+                        const contentString = typeof content === 'string' ? content : '';
+                        if (contentString.includes("Start") || contentString.includes("Sector")) {
+                            markersToRemove.push(layer);
+                        }
+                    }
+                }
+            });
+            markersToRemove.forEach(marker => {
+                if (mapRef.current) {
+                    mapRef.current.removeLayer(marker);
+                }
+            });
+        }
+        setStartFinish(null);
+        setSectors([]);
+        setHistory([]);
+    };
+
+    const handleCloseHelp = () => {
+        setShowHelp(false);
+        localStorage.setItem('mapHelpShown', 'true');
+    };
+
     return (
-        <div
-            id="map"
-            style={{
-                width: "100%",
-                height: "100%",
-                borderRadius: "10px",
-            }}
-        />
+        <Box sx={{ position: 'relative', width: '100%', height: '100%' }}>
+            <div id="map" style={{ width: "100%", height: "100%", borderRadius: "10px" }} />
+
+            {/* Hilfe Overlay */}
+            {showHelp && (
+                <Box sx={{
+                    position: 'absolute',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    backgroundColor: 'rgba(0,0,0,0.7)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    zIndex: 2000,
+                    borderRadius: '10px'
+                }}>
+                    <Box sx={{
+                        backgroundColor: 'white',
+                        padding: 4,
+                        borderRadius: 3,
+                        maxWidth: 500,
+                        textAlign: 'center'
+                    }}>
+                        <Typography variant="h5" sx={{ mb: 2, color: CTM_Colors.ctm_green }}>
+                            Map Controls
+                        </Typography>
+                        <Box sx={{ textAlign: 'left', mb: 3 }}>
+                            <Typography sx={{ mb: 1 }}><strong>Click:</strong> Set Start/Finish Line</Typography>
+                            <Typography sx={{ mb: 1 }}><strong>Ctrl + Click:</strong> Add Sector Point</Typography>
+                            <Typography sx={{ mb: 1 }}><strong>Undo:</strong> Remove last placed marker</Typography>
+                            <Typography><strong>Clear All:</strong> Remove all markers</Typography>
+                        </Box>
+                        <Button variant="contained" onClick={handleCloseHelp}
+                                sx={{ backgroundColor: CTM_Colors.ctm_green, color: CTM_Colors.black,
+                                    '&:hover': { backgroundColor: CTM_Colors.grey } }}>
+                            Got it!
+                        </Button>
+                    </Box>
+                </Box>
+            )}
+
+            {/* Control Buttons */}
+            <Box sx={{
+                position: 'absolute', bottom: 20, left: 20,
+                display: 'flex', gap: 1, zIndex: 1000, flexWrap: 'wrap'
+            }}>
+                <Button variant="contained" size="small" onClick={handleUndo} disabled={history.length === 0}
+                        sx={{ backgroundColor: history.length > 0 ? '#ff9800' : '#ccc', color: 'white',
+                            '&:hover': { backgroundColor: history.length > 0 ? '#f57c00' : '#ccc' }, minWidth: 40 }}>
+                    <UndoIcon />
+                </Button>
+
+                <Button variant="contained" size="small" onClick={handleClearAll} disabled={history.length === 0}
+                        sx={{ backgroundColor: history.length > 0 ? '#f44336' : '#ccc', color: 'white',
+                            '&:hover': { backgroundColor: history.length > 0 ? '#d32f2f' : '#ccc' } }}>
+                    X
+                </Button>
+
+                <Button variant="outlined" size="small" onClick={() => setShowHelp(true)}
+                        sx={{ borderColor: CTM_Colors.ctm_green, color: CTM_Colors.ctm_green,
+                            '&:hover': { backgroundColor: 'rgba(28, 150, 0, 0.1)' } }}>
+                    ?
+                </Button>
+            </Box>
+
+            {/* Status Info */}
+            <Box sx={{
+                position: 'absolute', bottom: 20, right: 20,
+                zIndex: 1000, display: 'flex', gap: 1, flexWrap: 'wrap'
+            }}>
+                {startFinish && <Chip label="Start/Finish set" size="small" sx={{ backgroundColor: '#4CAF50', color: 'white' }} />}
+                {sectors.length > 0 && <Chip label={`${sectors.length} Sectors`} size="small" sx={{ backgroundColor: '#2196F3', color: 'white' }} />}
+                {history.length > 0 && <Chip label={`${history.length} actions`} size="small" sx={{ backgroundColor: '#ff9800', color: 'white' }} />}
+            </Box>
+        </Box>
     );
 };
 
