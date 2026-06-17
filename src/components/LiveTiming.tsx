@@ -85,9 +85,14 @@ const LiveTiming: React.FC = () => {
                     sort: "-created",
                     expand: "driver",
                     filter: `discipline="${discipline}"`
-
                 });
-                setLaps(records as any);
+
+                const filteredRecords = (records as any[]).filter((record: any) => {
+                    const timeInSeconds = parseFloat(record.lapTime);
+                    return timeInSeconds >= 3 && timeInSeconds <= 1200;
+                });
+
+                setLaps(filteredRecords);
             } catch (err) {
                 console.error("Error loading laps:", err);
                 toast.error("Failed to load laps");
@@ -197,6 +202,10 @@ const LiveTiming: React.FC = () => {
     //  Local Laps nach Zeit schnellste
     const sortedLocalLaps = [...localLaps]
         .filter(lap => lap.time > 0) // Nur gültige Runden
+        .filter(lap => {
+            const timeInSeconds = lap.time / 1000;
+            return timeInSeconds >= 3 && timeInSeconds <= 1200;
+        })
         .sort((a, b) => a.time - b.time); // Aufsteigend
 
     // Finde die schnellste Runde
@@ -247,8 +256,27 @@ const LiveTiming: React.FC = () => {
     };
 
     const getTimeWithPenalty = (timeMs: number, cones: number): number => {
-        return (timeMs / 1000) + cones;
+        const timeInSeconds = timeMs / 1000;
+
+        if (timeInSeconds < 2 || timeInSeconds > 1200) {
+            return 0;
+        }
+
+        return timeInSeconds + cones;
     };
+
+    const filterOutMinMax =  (laps: LocalLap[]): LocalLap[] => {
+        // Mindestzeit in Sekunden
+        const MIN_LAP_TIME_SECONDS = 3;
+
+        // Maximale Zeit in Sekunden 20min
+        const MAX_LAP_TIME_SECONDS = 1200;
+
+        return laps.filter(lap => {
+            const timeInSeconds = lap.time / 1000;
+            return timeInSeconds >= MIN_LAP_TIME_SECONDS && timeInSeconds <= MAX_LAP_TIME_SECONDS;
+        });
+    }
 
     return (
         <Grid
@@ -450,9 +478,10 @@ const LiveTiming: React.FC = () => {
                 ) : (
                     sortedLocalLaps.map((lap, i) => {
                         const driver = drivers.find(d=> d.id === lap.driverId);
-                        const isFastest = fastestLapTime && lap.time === fastestLapTime;
                         const cones = getCones(i);
                         const totalTime = getTimeWithPenalty(lap.time, cones);
+                        const isFastest = fastestLapTime && lap.time === fastestLapTime;
+
 
                         return (
                             <Box key={i}>

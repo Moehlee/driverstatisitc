@@ -140,6 +140,7 @@ const RunContent = () => {
                     sx={{
                         borderRadius: 3,
                         overflow: "hidden",
+                        height: "700px"
                     }}
                 >
                     <LiveMap />
@@ -153,6 +154,7 @@ const RunContent = () => {
                         p: 2,
                         display: "flex",
                         flexDirection: "column",
+                        height: "700px"
                     }}
                 >
                     {/* Stats Option */}
